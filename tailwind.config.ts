@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,68 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				poa: {
+					blue: {
+						50: '#f0f7ff',
+						100: '#deeeff',
+						200: '#b6ddff',
+						300: '#75c5ff',
+						400: '#38a8ff',
+						500: '#0b8aff',
+						600: '#006be0',
+						700: '#0054b3',
+						800: '#004895',
+						900: '#003e7c',
+					},
+					gray: {
+						50: '#f8f9fa',
+						100: '#f1f3f5',
+						200: '#e9ecef',
+						300: '#dee2e6',
+						400: '#ced4da',
+						500: '#adb5bd',
+						600: '#868e96',
+						700: '#495057',
+						800: '#343a40',
+						900: '#212529',
+					},
+					green: {
+						50: '#e6f7ec',
+						100: '#d0f0de',
+						200: '#a0e2be',
+						300: '#53c98b',
+						400: '#2eb06d',
+						500: '#1e874a',
+						600: '#186c3c',
+						700: '#155d34',
+						800: '#11472a',
+						900: '#0e3a22',
+					},
+					red: {
+						50: '#ffeaea',
+						100: '#ffd5d5',
+						200: '#ffabab',
+						300: '#ff8282',
+						400: '#ff5858',
+						500: '#ff2e2e',
+						600: '#e50000',
+						700: '#b80000',
+						800: '#9a0000',
+						900: '#7d0000',
+					},
+					yellow: {
+						50: '#fff9e6',
+						100: '#fff3cc',
+						200: '#ffe799',
+						300: '#ffdb66',
+						400: '#ffcf33',
+						500: '#ffc300',
+						600: '#cca000',
+						700: '#997800',
+						800: '#7a6000',
+						900: '#664f00',
+					}
 				}
 			},
 			borderRadius: {
