@@ -13,6 +13,9 @@ interface DataContextType {
   approvePlan: (planId: number, status: PlanStatus, comments?: string) => void;
   addWorkLog: (planId: number, actualTime: number, unplannedWork?: string) => void;
   getPlanById: (planId: number) => Plan | undefined;
+  getPlansForDateRange: (startDate: string, endDate: string) => Plan[];
+  getWorkLogSummary: () => { date: string; hoursLogged: number }[];
+  getUserPerformance: (userId?: number) => { onTime: number; delayed: number; total: number };
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -118,9 +121,89 @@ const initialPlans: Plan[] = [
   }
 ];
 
+// Add some more sample data
+const morePlans: Plan[] = [
+  {
+    id: 4,
+    userId: 3, // SDE
+    date: '2023-06-02',
+    status: 'Approved',
+    createdAt: '2023-06-02T08:00:00Z',
+    updatedAt: '2023-06-02T16:00:00Z',
+    deliverables: [
+      {
+        id: 5,
+        description: 'Refactor authentication module',
+        estimatedTime: 5,
+        actualTime: 4.5,
+        overflowHours: 0,
+        rework: 'No',
+        achieved: 'Yes',
+      },
+      {
+        id: 6,
+        description: 'Document API endpoints',
+        estimatedTime: 3,
+        actualTime: 3.5,
+        overflowHours: 0.5,
+        rework: 'No',
+        achieved: 'Yes',
+      }
+    ],
+    approvals: [
+      {
+        id: 4,
+        planId: 4,
+        approvedBy: 2, // Team Lead
+        role: 'Team Lead',
+        status: 'Approved',
+        comments: 'Good work on the refactoring',
+        timestamp: '2023-06-02T12:00:00Z',
+      },
+      {
+        id: 5,
+        planId: 4,
+        approvedBy: 1, // Manager
+        role: 'Manager',
+        status: 'Approved',
+        comments: 'Approved',
+        timestamp: '2023-06-02T16:00:00Z',
+      }
+    ]
+  },
+  {
+    id: 5,
+    userId: 3, // SDE
+    date: '2023-06-03',
+    status: 'Pending',
+    createdAt: '2023-06-03T08:00:00Z',
+    updatedAt: '2023-06-03T08:00:00Z',
+    deliverables: [
+      {
+        id: 7,
+        description: 'Fix reported bugs in login screen',
+        estimatedTime: 4,
+        actualTime: 3,
+        overflowHours: 0,
+        rework: 'No',
+        achieved: 'Yes',
+      },
+      {
+        id: 8,
+        description: 'Add new feature for admin dashboard',
+        estimatedTime: 6,
+        actualTime: 0,
+        overflowHours: 0,
+        rework: 'None',
+        achieved: 'None',
+      }
+    ]
+  }
+];
+
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const [plans, setPlans] = useState<Plan[]>(initialPlans);
+  const [plans, setPlans] = useState<Plan[]>([...initialPlans, ...morePlans]);
   
   // Get plans for the current user
   const userPlans = user ? plans.filter(plan => plan.userId === user.id) : [];
@@ -240,6 +323,60 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return plans.find(plan => plan.id === planId);
   };
 
+  // New function: Get plans for a date range
+  const getPlansForDateRange = (startDate: string, endDate: string) => {
+    return plans.filter(plan => {
+      const planDate = new Date(plan.date);
+      return planDate >= new Date(startDate) && planDate <= new Date(endDate);
+    });
+  };
+
+  // New function: Get work log summary
+  const getWorkLogSummary = () => {
+    const summary: { date: string; hoursLogged: number }[] = [];
+    
+    // Group hours logged by date
+    plans.forEach(plan => {
+      const date = plan.date;
+      const hoursLogged = plan.deliverables.reduce((sum, d) => sum + (d.actualTime || 0), 0);
+      
+      const existingEntry = summary.find(entry => entry.date === date);
+      if (existingEntry) {
+        existingEntry.hoursLogged += hoursLogged;
+      } else {
+        summary.push({ date, hoursLogged });
+      }
+    });
+    
+    return summary.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  };
+
+  // New function: Get user performance metrics
+  const getUserPerformance = (userId?: number) => {
+    const userPlanIds = userId 
+      ? plans.filter(p => p.userId === userId).map(p => p.id)
+      : user ? plans.filter(p => p.userId === user.id).map(p => p.id) : [];
+      
+    const userPlans = plans.filter(p => userPlanIds.includes(p.id));
+    
+    let onTime = 0;
+    let delayed = 0;
+    
+    userPlans.forEach(plan => {
+      plan.deliverables.forEach(d => {
+        if (d.actualTime !== undefined) {
+          if (d.actualTime <= d.estimatedTime) {
+            onTime++;
+          } else {
+            delayed++;
+          }
+        }
+      });
+    });
+    
+    return { onTime, delayed, total: onTime + delayed };
+  };
+
   return (
     <DataContext.Provider value={{
       plans,
@@ -249,7 +386,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatePlan,
       approvePlan,
       addWorkLog,
-      getPlanById
+      getPlanById,
+      getPlansForDateRange,
+      getWorkLogSummary,
+      getUserPerformance
     }}>
       {children}
     </DataContext.Provider>

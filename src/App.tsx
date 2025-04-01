@@ -13,6 +13,8 @@ import MyPlans from "./pages/MyPlans";
 import CreatePlan from "./pages/CreatePlan";
 import PlanDetail from "./pages/PlanDetail";
 import Approvals from "./pages/Approvals";
+import Reports from "./pages/Reports";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +41,8 @@ const AppRoutes = () => {
       <Route path="/create-plan" element={<ProtectedRoute><CreatePlan /></ProtectedRoute>} />
       <Route path="/plan/:planId" element={<ProtectedRoute><PlanDetail /></ProtectedRoute>} />
       <Route path="/approvals" element={<ProtectedRoute><Approvals /></ProtectedRoute>} />
+      <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

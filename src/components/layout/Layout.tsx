@@ -4,7 +4,15 @@ import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/types';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { LogOut, User, ChevronRight } from 'lucide-react';
+import { LogOut, User, ChevronRight, Settings } from 'lucide-react';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -24,7 +32,7 @@ const getRoleBasedLinks = (role: UserRole) => {
         { name: 'Dashboard', path: '/dashboard' },
         { name: 'My Plans', path: '/my-plans' },
         { name: 'Approvals', path: '/approvals' },
-        { name: 'Team Reports', path: '/team-reports' },
+        { name: 'Reports', path: '/reports' },
       ];
     case 'SDE':
     case 'JSDE':
@@ -77,20 +85,32 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           <div className="flex items-center">
             <div className="flex items-center space-x-4">
-              <div className="flex items-center text-sm">
-                <span className="hidden md:inline-block font-medium text-poa-gray-700 mr-2">{user.name}</span>
-                <span className="bg-poa-blue-100 text-poa-blue-800 py-1 px-2 rounded-full text-xs">
-                  {user.role}
-                </span>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={handleLogout}
-                aria-label="Logout"
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <div className="flex items-center justify-center h-8 w-8 rounded-full bg-poa-blue-100">
+                      <User className="h-4 w-4 text-poa-blue-600" />
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col">
+                      <span>{user.name}</span>
+                      <span className="text-xs text-poa-gray-500">{user.role}</span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
@@ -131,6 +151,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   {link.name}
                 </Link>
               ))}
+              <div className="pt-4 mt-4 border-t border-poa-gray-200">
+                <Link
+                  to="/profile"
+                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+                    location.pathname === '/profile'
+                      ? 'bg-poa-blue-50 text-poa-blue-700'
+                      : 'text-poa-gray-700 hover:bg-poa-gray-100'
+                  }`}
+                >
+                  My Profile
+                </Link>
+              </div>
             </div>
           </nav>
         </aside>

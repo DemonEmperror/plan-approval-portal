@@ -55,3 +55,16 @@ export interface WorkLog {
   actualTime: number;
   unplannedWork?: string;
 }
+
+export interface UserPerformance {
+  onTime: number;
+  delayed: number;
+  total: number;
+}
+
+export interface ReportFilters {
+  startDate?: string;
+  endDate?: string;
+  userId?: number;
+  status?: PlanStatus;
+}
