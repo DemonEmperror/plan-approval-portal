@@ -14,11 +14,14 @@ import { Trash2, Plus, Calendar } from 'lucide-react';
 
 const CreatePlan = () => {
   const { user } = useAuth();
-  const { createPlan } = useData();
+  const { createPlan, userProjects } = useData();
   const navigate = useNavigate();
   
   const today = new Date().toISOString().split('T')[0];
   const [date, setDate] = useState(today);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>(
+    userProjects.length > 0 ? userProjects[0].id : undefined
+  );
   
   // Initial empty deliverable
   const initialDeliverable: Omit<Deliverable, 'id'> = {
@@ -59,6 +62,11 @@ const CreatePlan = () => {
       return;
     }
     
+    if (!selectedProjectId) {
+      toast.error('Please select a project');
+      return;
+    }
+    
     if (deliverables.length === 0) {
       toast.error('Please add at least one deliverable');
       return;
@@ -82,8 +90,8 @@ const CreatePlan = () => {
       id: index + 1
     }));
     
-    // Create the plan
-    createPlan(date, deliverablesWithIds);
+    // Create the plan with project ID
+    createPlan(selectedProjectId, date, deliverablesWithIds);
     
     // Navigate to My Plans page
     navigate('/my-plans');
@@ -139,6 +147,37 @@ const CreatePlan = () => {
                   />
                 </div>
               </div>
+            </div>
+            
+            {/* Project Selection */}
+            <div className="mb-6">
+              <Label htmlFor="project-select">Project</Label>
+              <Select 
+                value={selectedProjectId?.toString()} 
+                onValueChange={(value) => setSelectedProjectId(Number(value))}
+              >
+                <SelectTrigger id="project-select" className="w-full">
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userProjects.length > 0 ? (
+                    userProjects.map((project) => (
+                      <SelectItem key={project.id} value={project.id.toString()}>
+                        {project.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      No projects available
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              {userProjects.length === 0 && (
+                <p className="text-sm text-poa-red-600 mt-1">
+                  You are not assigned to any projects. Please contact your manager.
+                </p>
+              )}
             </div>
             
             <div className="mb-6">
@@ -225,6 +264,7 @@ const CreatePlan = () => {
                 <Button 
                   type="submit" 
                   className="bg-poa-blue-600 hover:bg-poa-blue-700"
+                  disabled={!selectedProjectId || userProjects.length === 0}
                 >
                   Submit Plan
                 </Button>

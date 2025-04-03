@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Plan, Deliverable, PlanStatus, User, Approval, WorkLog, Project, ProjectMember, UserRole } from '@/types';
 import { useAuth } from './AuthContext';
@@ -112,6 +113,7 @@ const initialPlans: Plan[] = [
   {
     id: 1,
     userId: 3, // SDE
+    projectId: 1, // Website Redesign project
     date: '2023-06-01',
     status: 'Pending',
     createdAt: '2023-06-01T08:00:00Z',
@@ -140,6 +142,7 @@ const initialPlans: Plan[] = [
   {
     id: 2,
     userId: 4, // JSDE
+    projectId: 1, // Website Redesign project
     date: '2023-06-01',
     status: 'Approved',
     createdAt: '2023-06-01T08:30:00Z',
@@ -179,6 +182,7 @@ const initialPlans: Plan[] = [
   {
     id: 3,
     userId: 5, // Intern
+    projectId: 1, // Website Redesign project
     date: '2023-06-01',
     status: 'Needs Rework',
     createdAt: '2023-06-01T09:00:00Z',
@@ -212,6 +216,7 @@ const morePlans: Plan[] = [
   {
     id: 4,
     userId: 3, // SDE
+    projectId: 1, // Website Redesign project
     date: '2023-06-02',
     status: 'Approved',
     createdAt: '2023-06-02T08:00:00Z',
@@ -260,6 +265,7 @@ const morePlans: Plan[] = [
   {
     id: 5,
     userId: 3, // SDE
+    projectId: 2, // Mobile App Development project
     date: '2023-06-03',
     status: 'Pending',
     createdAt: '2023-06-03T08:00:00Z',
@@ -287,19 +293,20 @@ const morePlans: Plan[] = [
   }
 ];
 
-const updatedInitialPlans = initialPlans.map(plan => ({
-  ...plan,
-  projectId: 1
-}));
+// We don't need these anymore since we're directly providing projectId in the plan objects
+// const updatedInitialPlans = initialPlans.map(plan => ({
+//   ...plan,
+//   projectId: 1
+// }));
 
-const updatedMorePlans = morePlans.map(plan => ({
-  ...plan,
-  projectId: plan.id % 2 === 0 ? 1 : 2
-}));
+// const updatedMorePlans = morePlans.map(plan => ({
+//   ...plan,
+//   projectId: plan.id % 2 === 0 ? 1 : 2
+// }));
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const [plans, setPlans] = useState<Plan[]>([...updatedInitialPlans, ...updatedMorePlans]);
+  const [plans, setPlans] = useState<Plan[]>([...initialPlans, ...morePlans]);
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>(initialProjectMembers);
   
