@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, BarChart, Bar, Tooltip, Legend } from 'recharts';
 import { Plan, User, Project } from '@/types';
 import { useNavigate } from 'react-router-dom';
@@ -266,7 +267,7 @@ const Dashboard = () => {
                         <div>
                           <Badge 
                             variant={
-                              plan.status === 'Approved' ? 'success' : 
+                              plan.status === 'Approved' ? 'default' : 
                               plan.status === 'Needs Rework' ? 'destructive' : 
                               plan.status === 'Rejected' ? 'destructive' : 
                               'secondary'
