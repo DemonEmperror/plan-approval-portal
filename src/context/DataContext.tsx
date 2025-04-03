@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Plan, Deliverable, PlanStatus, User, Approval, WorkLog, Project, ProjectMember, UserRole } from '@/types';
 import { useAuth } from './AuthContext';
@@ -27,6 +26,12 @@ interface DataContextType {
   getProjectMembers: (projectId: number) => ProjectMember[];
   getUsersByProject: (projectId: number) => User[];
   getTeamPlans: (projectId: number) => Plan[];
+  users: User[];
+  getAllUsers: () => User[];
+  getUserById: (userId: number) => User | undefined;
+  createUser: (name: string, email: string, role: UserRole) => void;
+  updateUser: (userId: number, updates: Partial<User>) => void;
+  toggleUserActiveStatus: (userId: number) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -293,22 +298,21 @@ const morePlans: Plan[] = [
   }
 ];
 
-// We don't need these anymore since we're directly providing projectId in the plan objects
-// const updatedInitialPlans = initialPlans.map(plan => ({
-//   ...plan,
-//   projectId: 1
-// }));
-
-// const updatedMorePlans = morePlans.map(plan => ({
-//   ...plan,
-//   projectId: plan.id % 2 === 0 ? 1 : 2
-// }));
+const initialUsers: User[] = [
+  { id: 1, name: 'John Manager', email: 'manager@example.com', role: 'Manager', isActive: true, createdAt: '2023-01-01T08:00:00Z', updatedAt: '2023-01-01T08:00:00Z' },
+  { id: 2, name: 'Jane Team Lead', email: 'teamlead@example.com', role: 'Team Lead', isActive: true, createdAt: '2023-01-01T08:00:00Z', updatedAt: '2023-01-01T08:00:00Z' },
+  { id: 3, name: 'Bob Developer', email: 'sde@example.com', role: 'SDE', isActive: true, createdAt: '2023-01-01T08:00:00Z', updatedAt: '2023-01-01T08:00:00Z' },
+  { id: 4, name: 'Alice Junior Dev', email: 'jsde@example.com', role: 'JSDE', isActive: true, createdAt: '2023-01-01T08:00:00Z', updatedAt: '2023-01-01T08:00:00Z' },
+  { id: 5, name: 'Charlie Intern', email: 'intern@example.com', role: 'Intern', isActive: true, createdAt: '2023-01-01T08:00:00Z', updatedAt: '2023-01-01T08:00:00Z' },
+  { id: 6, name: 'Admin User', email: 'admin@example.com', role: 'Admin', isActive: true, createdAt: '2023-01-01T08:00:00Z', updatedAt: '2023-01-01T08:00:00Z' },
+];
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([...initialPlans, ...morePlans]);
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>(initialProjectMembers);
+  const [users, setUsers] = useState<User[]>(initialUsers);
   
   const userProjects = user ? projects.filter(project => {
     return projectMembers.some(member => member.projectId === project.id && member.userId === user.id);
@@ -653,31 +657,109 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getUsersByProject = (projectId: number) => {
     const members = getProjectMembers(projectId);
-    const users: User[] = [];
+    const projectUsers: User[] = [];
     
     for (const member of members) {
-      const mockUsers: User[] = [
-        { id: 1, name: 'John Manager', email: 'manager@example.com', role: 'Manager' },
-        { id: 2, name: 'Jane Team Lead', email: 'teamlead@example.com', role: 'Team Lead' },
-        { id: 3, name: 'Bob Developer', email: 'sde@example.com', role: 'SDE' },
-        { id: 4, name: 'Alice Junior Dev', email: 'jsde@example.com', role: 'JSDE' },
-        { id: 5, name: 'Charlie Intern', email: 'intern@example.com', role: 'Intern' },
-      ];
-      
-      const foundUser = mockUsers.find(u => u.id === member.userId);
+      const foundUser = users.find(u => u.id === member.userId);
       if (foundUser) {
-        users.push({
+        projectUsers.push({
           ...foundUser,
           role: member.isTemporaryManager ? 'Temporary Manager' : foundUser.role,
         });
       }
     }
     
-    return users;
+    return projectUsers;
   };
 
   const getTeamPlans = (projectId: number) => {
     return plans.filter(plan => plan.projectId === projectId);
+  };
+
+  const getAllUsers = () => {
+    return users;
+  };
+
+  const getUserById = (userId: number) => {
+    return users.find(u => u.id === userId);
+  };
+
+  const createUser = (name: string, email: string, role: UserRole) => {
+    if (!user) return;
+    
+    if (user.role !== 'Admin') {
+      toast.error('Only admins can create users');
+      return;
+    }
+    
+    if (users.some(u => u.email === email)) {
+      toast.error('User with this email already exists');
+      return;
+    }
+    
+    const newUser: User = {
+      id: users.length + 1,
+      name,
+      email,
+      role,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    setUsers([...users, newUser]);
+    toast.success('User created successfully!');
+  };
+
+  const updateUser = (userId: number, updates: Partial<User>) => {
+    if (!user) return;
+    
+    if (user.role !== 'Admin') {
+      toast.error('Only admins can update users');
+      return;
+    }
+    
+    setUsers(users.map(u => {
+      if (u.id === userId) {
+        return {
+          ...u,
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return u;
+    }));
+    
+    toast.success('User updated successfully!');
+  };
+
+  const toggleUserActiveStatus = (userId: number) => {
+    if (!user) return;
+    
+    if (user.role !== 'Admin') {
+      toast.error('Only admins can change user status');
+      return;
+    }
+    
+    if (userId === user.id) {
+      toast.error('You cannot deactivate your own account');
+      return;
+    }
+    
+    setUsers(users.map(u => {
+      if (u.id === userId) {
+        return {
+          ...u,
+          isActive: !u.isActive,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return u;
+    }));
+    
+    const targetUser = users.find(u => u.id === userId);
+    const newStatus = targetUser?.isActive ? 'deactivated' : 'activated';
+    toast.success(`User ${newStatus} successfully!`);
   };
 
   return (
@@ -703,7 +785,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       getProjectById,
       getProjectMembers,
       getUsersByProject,
-      getTeamPlans
+      getTeamPlans,
+      users,
+      getAllUsers,
+      getUserById,
+      createUser,
+      updateUser,
+      toggleUserActiveStatus,
     }}>
       {children}
     </DataContext.Provider>

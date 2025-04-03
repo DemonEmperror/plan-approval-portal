@@ -1,354 +1,386 @@
 
-import React, { useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import React from 'react';
 import { useData } from '@/context/DataContext';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import Layout from '@/components/layout/Layout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  FileText, 
-  CheckCircle, 
-  AlertCircle, 
-  RotateCw, 
-  Clock, 
-  Plus, 
-  FolderOpen,
-  Users
-} from 'lucide-react';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
+import { PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, BarChart, Bar, Tooltip, Legend } from 'recharts';
+import { Plan, User, Project } from '@/types';
+import { useNavigate } from 'react-router-dom';
+import { ClipboardList, FolderOpen, Users, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 const Dashboard = () => {
   const { user } = useAuth();
   const { 
-    plans, 
     userPlans, 
     pendingApprovalPlans, 
+    plans, 
     userProjects, 
-    getTeamPlans 
+    getUserPerformance,
+    getUsersByProject,
+    users
   } = useData();
   const navigate = useNavigate();
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
-    userProjects.length > 0 ? userProjects[0].id : null
-  );
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
-  // Get plans for the selected project
-  const projectPlans = selectedProjectId ? getTeamPlans(selectedProjectId) : [];
+  const isAdmin = user.role === 'Admin';
+  const isManager = user.role === 'Manager' || user.role === 'Temporary Manager';
+  const isTeamLead = user.role === 'Team Lead';
 
-  // Function to get statistics based on user role
-  const getStatistics = () => {
-    if (user.role === 'Manager' || user.role === 'Team Lead' || user.role === 'Temporary Manager') {
-      // For management roles - show project-specific stats if a project is selected
-      const plansToAnalyze = selectedProjectId ? projectPlans : plans;
-      
-      const pendingCount = plansToAnalyze.filter(p => p.status === 'Pending').length;
-      const approvedCount = plansToAnalyze.filter(p => p.status === 'Approved').length;
-      const rejectedCount = plansToAnalyze.filter(p => p.status === 'Rejected').length;
-      const reworkCount = plansToAnalyze.filter(p => p.status === 'Needs Rework').length;
-      
-      return [
-        { 
-          title: 'Pending Plans', 
-          count: pendingCount, 
-          icon: <Clock className="h-5 w-5 text-poa-yellow-500" />,
-          color: 'bg-poa-yellow-50 text-poa-yellow-700'
-        },
-        { 
-          title: 'Approved Plans', 
-          count: approvedCount, 
-          icon: <CheckCircle className="h-5 w-5 text-poa-green-500" />,
-          color: 'bg-poa-green-50 text-poa-green-700'
-        },
-        { 
-          title: 'Rejected Plans', 
-          count: rejectedCount, 
-          icon: <AlertCircle className="h-5 w-5 text-poa-red-500" />,
-          color: 'bg-poa-red-50 text-poa-red-700'
-        },
-        { 
-          title: 'Needs Rework', 
-          count: reworkCount, 
-          icon: <RotateCw className="h-5 w-5 text-poa-blue-500" />,
-          color: 'bg-poa-blue-50 text-poa-blue-700'
-        }
-      ];
-    } else {
-      // For regular employees
-      const pendingCount = userPlans.filter(p => p.status === 'Pending').length;
-      const approvedCount = userPlans.filter(p => p.status === 'Approved').length;
-      const reworkCount = userPlans.filter(p => p.status === 'Needs Rework').length;
-      
-      return [
-        { 
-          title: 'Pending Plans', 
-          count: pendingCount, 
-          icon: <Clock className="h-5 w-5 text-poa-yellow-500" />,
-          color: 'bg-poa-yellow-50 text-poa-yellow-700'
-        },
-        { 
-          title: 'Approved Plans', 
-          count: approvedCount, 
-          icon: <CheckCircle className="h-5 w-5 text-poa-green-500" />,
-          color: 'bg-poa-green-50 text-poa-green-700'
-        },
-        { 
-          title: 'Needs Rework', 
-          count: reworkCount, 
-          icon: <RotateCw className="h-5 w-5 text-poa-blue-500" />,
-          color: 'bg-poa-blue-50 text-poa-blue-700'
-        }
-      ];
+  const performance = getUserPerformance();
+  
+  const performanceData = [
+    { name: 'On Time', value: performance.onTime },
+    { name: 'Delayed', value: performance.delayed },
+  ];
+
+  // Get unique projects from all plans
+  const uniqueProjects = new Map<number, Project>();
+  plans.forEach(plan => {
+    const project = userProjects.find(p => p.id === plan.projectId);
+    if (project) {
+      uniqueProjects.set(project.id, project);
     }
+  });
+
+  // Calculate project stats
+  const projectStats = Array.from(uniqueProjects.values()).map(project => {
+    const projectPlans = plans.filter(p => p.projectId === project.id);
+    const completedPlans = projectPlans.filter(p => p.status === 'Approved').length;
+    const members = getUsersByProject(project.id).length;
+    
+    return {
+      id: project.id,
+      name: project.name,
+      totalPlans: projectPlans.length,
+      completedPlans,
+      progressPercentage: projectPlans.length ? Math.round((completedPlans / projectPlans.length) * 100) : 0,
+      members
+    };
+  });
+
+  // System-wide stats for admin
+  const systemStats = {
+    totalUsers: users.length,
+    totalProjects: userProjects.length,
+    totalPlans: plans.length,
+    pendingApprovals: pendingApprovalPlans.length
   };
 
-  const statistics = getStatistics();
-
-  // Function to render role-specific actions
-  const renderActions = () => {
-    if (user.role === 'Manager' || user.role === 'Team Lead' || user.role === 'Temporary Manager') {
-      return (
-        <div className="flex gap-2">
-          <Button 
-            onClick={() => navigate('/approvals')}
-            className="bg-poa-blue-600 hover:bg-poa-blue-700"
-          >
-            Review Plans
-          </Button>
-          {user.role === 'Manager' && (
-            <Button 
-              onClick={() => navigate('/projects/create')}
-              variant="outline"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              New Project
-            </Button>
-          )}
-        </div>
-      );
-    } else {
-      return (
-        <Button 
-          onClick={() => navigate('/create-plan')}
-          className="bg-poa-blue-600 hover:bg-poa-blue-700"
-        >
-          <Plus className="h-4 w-4 mr-1" />
-          Create New Plan
-        </Button>
-      );
-    }
+  // Status counts for pie chart
+  const statusCounts = {
+    approved: plans.filter(p => p.status === 'Approved').length,
+    pending: plans.filter(p => p.status === 'Pending').length,
+    rejected: plans.filter(p => p.status === 'Rejected').length,
+    needsRework: plans.filter(p => p.status === 'Needs Rework').length
   };
 
-  // Filter pending approvals for the selected project
-  const filteredPendingApprovals = selectedProjectId 
-    ? pendingApprovalPlans.filter(plan => plan.projectId === selectedProjectId)
-    : pendingApprovalPlans;
-
-  // Filter user plans for the selected project
-  const filteredUserPlans = selectedProjectId 
-    ? userPlans.filter(plan => plan.projectId === selectedProjectId)
-    : userPlans;
+  const statusData = [
+    { name: 'Approved', value: statusCounts.approved },
+    { name: 'Pending', value: statusCounts.pending },
+    { name: 'Rejected', value: statusCounts.rejected },
+    { name: 'Needs Rework', value: statusCounts.needsRework }
+  ];
 
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Welcome, {user.name}</h1>
-          {renderActions()}
+        <div>
+          <h1 className="text-2xl font-bold text-poa-gray-900">Welcome, {user.name}</h1>
+          <p className="text-poa-gray-500">Here's an overview of your work and responsibilities</p>
         </div>
-        
-        {/* Project Selector */}
-        {userProjects.length > 0 && (
-          <div className="flex items-center space-x-4">
-            <FolderOpen className="h-5 w-5 text-poa-blue-500" />
-            <div className="font-medium">Project:</div>
-            <Select
-              value={selectedProjectId?.toString() || ''}
-              onValueChange={(value) => setSelectedProjectId(parseInt(value))}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select a project" />
-              </SelectTrigger>
-              <SelectContent>
-                {userProjects.map((project) => (
-                  <SelectItem key={project.id} value={project.id.toString()}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {statistics.map((stat, index) => (
-            <Card key={index}>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.title}
-                </CardTitle>
-                {stat.icon}
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.count}</div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        
-        {(user.role === 'Manager' || user.role === 'Team Lead' || user.role === 'Temporary Manager') && 
-          filteredPendingApprovals.length > 0 && (
-          <div className="mt-6">
-            <h2 className="text-xl font-semibold mb-4">Plans Awaiting Your Approval</h2>
-            <div className="space-y-4">
-              {filteredPendingApprovals.slice(0, 3).map((plan) => (
-                <div key={plan.id} className="poa-card">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center">
-                        <FileText className="h-4 w-4 text-poa-blue-500 mr-2" />
-                        <h3 className="font-medium">Plan #{plan.id}</h3>
-                      </div>
-                      <p className="text-sm text-poa-gray-600 mt-1">
-                        Project: {userProjects.find(p => p.id === plan.projectId)?.name}
-                      </p>
-                      <p className="text-sm text-poa-gray-600">
-                        Submitted on {new Date(plan.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <span className="poa-status-badge poa-status-pending">
-                      Needs Review
-                    </span>
+
+        {isAdmin && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-poa-gray-500">Total Users</p>
+                    <h3 className="text-2xl font-bold">{systemStats.totalUsers}</h3>
                   </div>
-                  <div className="mt-3">
-                    <Button 
-                      size="sm" 
-                      onClick={() => navigate(`/plan/${plan.id}`)}
-                      className="bg-poa-blue-600 hover:bg-poa-blue-700"
-                    >
-                      Review
-                    </Button>
+                  <div className="h-12 w-12 bg-poa-blue-100 rounded-full flex items-center justify-center">
+                    <Users className="h-6 w-6 text-poa-blue-600" />
                   </div>
                 </div>
-              ))}
-              
-              {filteredPendingApprovals.length > 3 && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => navigate('/approvals')}
-                  className="w-full mt-2"
-                >
-                  View All ({filteredPendingApprovals.length})
-                </Button>
-              )}
-            </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-poa-gray-500">Total Projects</p>
+                    <h3 className="text-2xl font-bold">{systemStats.totalProjects}</h3>
+                  </div>
+                  <div className="h-12 w-12 bg-poa-green-100 rounded-full flex items-center justify-center">
+                    <FolderOpen className="h-6 w-6 text-poa-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-poa-gray-500">Total Plans</p>
+                    <h3 className="text-2xl font-bold">{systemStats.totalPlans}</h3>
+                  </div>
+                  <div className="h-12 w-12 bg-poa-purple-100 rounded-full flex items-center justify-center">
+                    <ClipboardList className="h-6 w-6 text-poa-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-poa-gray-500">Pending Approvals</p>
+                    <h3 className="text-2xl font-bold">{systemStats.pendingApprovals}</h3>
+                  </div>
+                  <div className="h-12 w-12 bg-poa-amber-100 rounded-full flex items-center justify-center">
+                    <Clock className="h-6 w-6 text-poa-amber-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
-        
-        {(user.role === 'SDE' || user.role === 'JSDE' || user.role === 'Intern') && (
-          <div className="mt-6">
-            <h2 className="text-xl font-semibold mb-4">My Recent Plans</h2>
-            <div className="space-y-4">
-              {filteredUserPlans.length > 0 ? (
-                filteredUserPlans.slice(0, 3).map((plan) => (
-                  <div key={plan.id} className="poa-card">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="flex items-center">
-                          <FileText className="h-4 w-4 text-poa-blue-500 mr-2" />
-                          <h3 className="font-medium">Plan for {new Date(plan.date).toLocaleDateString()}</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle>Projects Overview</CardTitle>
+              <CardDescription>Progress across all your projects</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {projectStats.length > 0 ? (
+                <div className="space-y-4">
+                  {projectStats.map(project => (
+                    <div key={project.id} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h4 className="font-medium">{project.name}</h4>
+                          <p className="text-sm text-poa-gray-500">
+                            {project.completedPlans} of {project.totalPlans} plans completed ({project.members} members)
+                          </p>
                         </div>
-                        <p className="text-sm text-poa-gray-600 mt-1">
-                          Project: {userProjects.find(p => p.id === plan.projectId)?.name}
-                        </p>
-                        <p className="text-sm text-poa-gray-600">
-                          {plan.deliverables.length} deliverables
-                        </p>
+                        <Button 
+                          variant="ghost" 
+                          onClick={() => navigate(`/projects/${project.id}`)}
+                        >
+                          View
+                        </Button>
                       </div>
-                      <span className={`poa-status-badge ${
-                        plan.status === 'Pending' ? 'poa-status-pending' :
-                        plan.status === 'Approved' ? 'poa-status-approved' :
-                        plan.status === 'Rejected' ? 'poa-status-rejected' :
-                        'poa-status-rework'
-                      }`}>
-                        {plan.status}
-                      </span>
+                      <div className="h-2 bg-poa-gray-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-poa-blue-600 rounded-full" 
+                          style={{ width: `${project.progressPercentage}%` }}
+                        ></div>
+                      </div>
                     </div>
-                    <div className="mt-3">
-                      <Button 
-                        size="sm"
-                        variant="outline"
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-poa-gray-500">
+                  <FolderOpen className="h-12 w-12 mx-auto text-poa-gray-300 mb-2" />
+                  <p>No projects found</p>
+                  {(isManager || isAdmin) && (
+                    <Button 
+                      variant="outline" 
+                      className="mt-2"
+                      onClick={() => navigate('/projects')}
+                    >
+                      Manage Projects
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Plans</CardTitle>
+              <CardDescription>
+                {isManager || isTeamLead ? 'Plans requiring your approval' : 'Your recent plan submissions'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(isManager || isTeamLead) ? (
+                <div className="space-y-2">
+                  {pendingApprovalPlans.length > 0 ? (
+                    pendingApprovalPlans.slice(0, 5).map((plan: Plan) => (
+                      <div 
+                        key={plan.id} 
+                        className="flex justify-between items-center p-2 hover:bg-poa-gray-50 rounded-md cursor-pointer"
                         onClick={() => navigate(`/plan/${plan.id}`)}
                       >
-                        View Details
+                        <div>
+                          <p className="font-medium">{plan.user?.name || 'Unknown User'}</p>
+                          <p className="text-sm text-poa-gray-500">{new Date(plan.date).toLocaleDateString()}</p>
+                        </div>
+                        <AlertCircle className="h-5 w-5 text-poa-amber-500" />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-poa-gray-500">
+                      <CheckCircle2 className="h-12 w-12 mx-auto text-poa-gray-300 mb-2" />
+                      <p>No pending approvals</p>
+                      <Button 
+                        variant="outline" 
+                        className="mt-2"
+                        onClick={() => navigate('/approvals')}
+                      >
+                        View All Approvals
                       </Button>
                     </div>
-                  </div>
-                ))
+                  )}
+                  {pendingApprovalPlans.length > 5 && (
+                    <Button 
+                      variant="link" 
+                      className="w-full mt-2"
+                      onClick={() => navigate('/approvals')}
+                    >
+                      View all {pendingApprovalPlans.length} pending approvals
+                    </Button>
+                  )}
+                </div>
               ) : (
-                <div className="text-center py-6 bg-white rounded-lg border border-poa-gray-200">
-                  <p className="text-poa-gray-600">No plans created yet</p>
-                  <Button 
-                    onClick={() => navigate('/create-plan')} 
-                    className="mt-2 bg-poa-blue-600 hover:bg-poa-blue-700"
-                  >
-                    Create Your First Plan
-                  </Button>
+                <div className="space-y-2">
+                  {userPlans.length > 0 ? (
+                    userPlans.slice(0, 5).map((plan: Plan) => (
+                      <div 
+                        key={plan.id} 
+                        className="flex justify-between items-center p-2 hover:bg-poa-gray-50 rounded-md cursor-pointer"
+                        onClick={() => navigate(`/plan/${plan.id}`)}
+                      >
+                        <div>
+                          <p className="font-medium">{plan.project?.name || 'Unknown Project'}</p>
+                          <p className="text-sm text-poa-gray-500">{new Date(plan.date).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <Badge 
+                            variant={
+                              plan.status === 'Approved' ? 'success' : 
+                              plan.status === 'Needs Rework' ? 'destructive' : 
+                              plan.status === 'Rejected' ? 'destructive' : 
+                              'secondary'
+                            }
+                          >
+                            {plan.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-poa-gray-500">
+                      <ClipboardList className="h-12 w-12 mx-auto text-poa-gray-300 mb-2" />
+                      <p>No plans created yet</p>
+                      <Button 
+                        variant="outline" 
+                        className="mt-2"
+                        onClick={() => navigate('/create-plan')}
+                      >
+                        Create Plan
+                      </Button>
+                    </div>
+                  )}
+                  {userPlans.length > 5 && (
+                    <Button 
+                      variant="link" 
+                      className="w-full mt-2"
+                      onClick={() => navigate('/my-plans')}
+                    >
+                      View all {userPlans.length} plans
+                    </Button>
+                  )}
                 </div>
               )}
-              
-              {filteredUserPlans.length > 3 && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => navigate('/my-plans')}
-                  className="w-full mt-2"
-                >
-                  View All Plans
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {/* Team Members Section */}
-        {selectedProjectId && (user.role === 'Manager' || user.role === 'Team Lead' || user.role === 'Temporary Manager') && (
-          <div className="mt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Team Overview</h2>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => navigate(`/projects/${selectedProjectId}/members`)}
-              >
-                <Users className="h-4 w-4 mr-1" />
-                Manage Team
-              </Button>
-            </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Performance Analysis</CardTitle>
+              <CardDescription>Your task completion performance</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[250px]">
+                {performance.total > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={performanceData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {performanceData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-poa-gray-500">
+                    <div className="text-center">
+                      <p>No performance data available yet</p>
+                      <p className="text-sm">Complete some tasks to see your performance</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {(isAdmin || isManager) && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Project Performance</CardTitle>
+                <CardTitle>Plan Status Distribution</CardTitle>
+                <CardDescription>Overview of all plan statuses</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-poa-gray-600">
-                  {projectPlans.length} plans created for this project
-                </p>
-                <p className="text-poa-gray-600">
-                  {projectPlans.filter(p => p.status === 'Approved').length} plans approved
-                </p>
-                {/* This would be a good place to add charts or more detailed analytics */}
+                <div className="h-[250px]">
+                  {plans.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={statusData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="value" fill="#8884d8">
+                          {statusData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-poa-gray-500">
+                      <div className="text-center">
+                        <p>No plan data available yet</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </Layout>
   );

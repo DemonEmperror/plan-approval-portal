@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/types';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { LogOut, User, ChevronRight, Settings, FolderOpen } from 'lucide-react';
+import { LogOut, User, ChevronRight, Settings, FolderOpen, Users, ClipboardList, CheckSquare, BarChart3, UserPlus } from 'lucide-react';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -20,41 +20,41 @@ interface LayoutProps {
 
 const getRoleBasedLinks = (role: UserRole) => {
   switch (role) {
+    case 'Admin':
+      return [
+        { name: 'Dashboard', path: '/dashboard', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
+        { name: 'Projects', path: '/projects', icon: <FolderOpen className="mr-2 h-4 w-4" /> },
+        { name: 'Users', path: '/users', icon: <Users className="mr-2 h-4 w-4" /> },
+        { name: 'Reports', path: '/reports', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
+      ];
     case 'Manager':
       return [
-        { name: 'Dashboard', path: '/dashboard' },
-        { name: 'Projects', path: '/projects' },
-        { name: 'Approvals', path: '/approvals' },
-        { name: 'Reports', path: '/reports' },
-        { name: 'Users', path: '/users' },
+        { name: 'Dashboard', path: '/dashboard', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
+        { name: 'Projects', path: '/projects', icon: <FolderOpen className="mr-2 h-4 w-4" /> },
+        { name: 'Approvals', path: '/approvals', icon: <CheckSquare className="mr-2 h-4 w-4" /> },
+        { name: 'Reports', path: '/reports', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
+        { name: 'Users', path: '/users', icon: <Users className="mr-2 h-4 w-4" /> },
       ];
     case 'Team Lead':
     case 'Temporary Manager':
       return [
-        { name: 'Dashboard', path: '/dashboard' },
-        { name: 'Projects', path: '/projects' },
-        { name: 'My Plans', path: '/my-plans' },
-        { name: 'Approvals', path: '/approvals' },
-        { name: 'Reports', path: '/reports' },
+        { name: 'Dashboard', path: '/dashboard', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
+        { name: 'Projects', path: '/projects', icon: <FolderOpen className="mr-2 h-4 w-4" /> },
+        { name: 'My Plans', path: '/my-plans', icon: <ClipboardList className="mr-2 h-4 w-4" /> },
+        { name: 'Approvals', path: '/approvals', icon: <CheckSquare className="mr-2 h-4 w-4" /> },
+        { name: 'Reports', path: '/reports', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
       ];
     case 'SDE':
     case 'JSDE':
     case 'Intern':
       return [
-        { name: 'Dashboard', path: '/dashboard' },
-        { name: 'Projects', path: '/projects' },
-        { name: 'My Plans', path: '/my-plans' },
-        { name: 'Create Plan', path: '/create-plan' },
-      ];
-    case 'Admin':
-      return [
-        { name: 'Dashboard', path: '/dashboard' },
-        { name: 'Projects', path: '/projects' },
-        { name: 'Users', path: '/users' },
-        { name: 'Settings', path: '/settings' },
+        { name: 'Dashboard', path: '/dashboard', icon: <BarChart3 className="mr-2 h-4 w-4" /> },
+        { name: 'Projects', path: '/projects', icon: <FolderOpen className="mr-2 h-4 w-4" /> },
+        { name: 'My Plans', path: '/my-plans', icon: <ClipboardList className="mr-2 h-4 w-4" /> },
+        { name: 'Create Plan', path: '/create-plan', icon: <UserPlus className="mr-2 h-4 w-4" /> },
       ];
     default:
-      return [{ name: 'Dashboard', path: '/dashboard' }];
+      return [{ name: 'Dashboard', path: '/dashboard', icon: <BarChart3 className="mr-2 h-4 w-4" /> }];
   }
 };
 
@@ -158,7 +158,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       : 'text-poa-gray-700 hover:bg-poa-gray-100'
                   }`}
                 >
-                  {link.name === 'Projects' && <FolderOpen className="mr-2 h-4 w-4" />}
+                  {link.icon}
                   {link.name}
                 </Link>
               ))}
@@ -171,6 +171,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       : 'text-poa-gray-700 hover:bg-poa-gray-100'
                   }`}
                 >
+                  <User className="mr-2 h-4 w-4" />
                   My Profile
                 </Link>
               </div>
