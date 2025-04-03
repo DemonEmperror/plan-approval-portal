@@ -1,6 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Plan, Deliverable, PlanStatus, User, Approval, WorkLog } from '@/types';
+import { Plan, Deliverable, PlanStatus, User, Approval, WorkLog, Project, ProjectMember, UserRole } from '@/types';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
 
@@ -8,19 +7,107 @@ interface DataContextType {
   plans: Plan[];
   userPlans: Plan[];
   pendingApprovalPlans: Plan[];
-  createPlan: (date: string, deliverables: Deliverable[]) => void;
+  projects: Project[];
+  userProjects: Project[];
+  projectMembers: ProjectMember[];
+  createPlan: (projectId: number, date: string, deliverables: Deliverable[]) => void;
   updatePlan: (planId: number, status: PlanStatus, deliverables?: Deliverable[]) => void;
   approvePlan: (planId: number, status: PlanStatus, comments?: string) => void;
   addWorkLog: (planId: number, actualTime: number, unplannedWork?: string) => void;
   getPlanById: (planId: number) => Plan | undefined;
-  getPlansForDateRange: (startDate: string, endDate: string) => Plan[];
+  getPlansForDateRange: (startDate: string, endDate: string, projectId?: number) => Plan[];
   getWorkLogSummary: () => { date: string; hoursLogged: number }[];
   getUserPerformance: (userId?: number) => { onTime: number; delayed: number; total: number };
+  createProject: (name: string, description: string) => void;
+  addProjectMember: (projectId: number, userId: number, role: UserRole) => void;
+  removeProjectMember: (projectMemberId: number) => void;
+  assignTemporaryManager: (projectId: number, userId: number, isTemporary: boolean) => void;
+  getProjectById: (projectId: number) => Project | undefined;
+  getProjectMembers: (projectId: number) => ProjectMember[];
+  getUsersByProject: (projectId: number) => User[];
+  getTeamPlans: (projectId: number) => Plan[];
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Mock initial data
+const initialProjects: Project[] = [
+  {
+    id: 1,
+    name: 'Website Redesign',
+    description: 'Redesigning the company website with modern UI/UX',
+    managerId: 1,
+    createdAt: '2023-05-15T08:00:00Z',
+    updatedAt: '2023-05-15T08:00:00Z',
+  },
+  {
+    id: 2,
+    name: 'Mobile App Development',
+    description: 'Creating a new mobile app for customers',
+    managerId: 1,
+    createdAt: '2023-05-20T09:00:00Z',
+    updatedAt: '2023-05-20T09:00:00Z',
+  },
+];
+
+const initialProjectMembers: ProjectMember[] = [
+  {
+    id: 1,
+    projectId: 1,
+    userId: 1, // Manager
+    role: 'Manager',
+    isTemporaryManager: false,
+    assignedAt: '2023-05-15T08:00:00Z',
+  },
+  {
+    id: 2,
+    projectId: 1,
+    userId: 2, // Team Lead
+    role: 'Team Lead',
+    isTemporaryManager: false,
+    assignedAt: '2023-05-15T08:30:00Z',
+  },
+  {
+    id: 3,
+    projectId: 1,
+    userId: 3, // SDE
+    role: 'SDE',
+    isTemporaryManager: false,
+    assignedAt: '2023-05-15T09:00:00Z',
+  },
+  {
+    id: 4,
+    projectId: 1,
+    userId: 4, // JSDE
+    role: 'JSDE',
+    isTemporaryManager: false,
+    assignedAt: '2023-05-15T09:30:00Z',
+  },
+  {
+    id: 5,
+    projectId: 1,
+    userId: 5, // Intern
+    role: 'Intern',
+    isTemporaryManager: false,
+    assignedAt: '2023-05-15T10:00:00Z',
+  },
+  {
+    id: 6,
+    projectId: 2,
+    userId: 1, // Manager
+    role: 'Manager',
+    isTemporaryManager: false,
+    assignedAt: '2023-05-20T09:00:00Z',
+  },
+  {
+    id: 7,
+    projectId: 2,
+    userId: 2, // Team Lead
+    role: 'Team Lead',
+    isTemporaryManager: true,
+    assignedAt: '2023-05-20T09:30:00Z',
+  },
+];
+
 const initialPlans: Plan[] = [
   {
     id: 1,
@@ -121,7 +208,6 @@ const initialPlans: Plan[] = [
   }
 ];
 
-// Add some more sample data
 const morePlans: Plan[] = [
   {
     id: 4,
@@ -201,38 +287,65 @@ const morePlans: Plan[] = [
   }
 ];
 
+const updatedInitialPlans = initialPlans.map(plan => ({
+  ...plan,
+  projectId: 1
+}));
+
+const updatedMorePlans = morePlans.map(plan => ({
+  ...plan,
+  projectId: plan.id % 2 === 0 ? 1 : 2
+}));
+
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const [plans, setPlans] = useState<Plan[]>([...initialPlans, ...morePlans]);
+  const [plans, setPlans] = useState<Plan[]>([...updatedInitialPlans, ...updatedMorePlans]);
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>(initialProjectMembers);
   
-  // Get plans for the current user
+  const userProjects = user ? projects.filter(project => {
+    return projectMembers.some(member => member.projectId === project.id && member.userId === user.id);
+  }) : [];
+
   const userPlans = user ? plans.filter(plan => plan.userId === user.id) : [];
   
-  // Get plans that need approval based on user role
   const pendingApprovalPlans = user ? plans.filter(plan => {
-    if (user.role === 'Team Lead') {
-      // Team leads see plans that are pending or need team lead approval
-      return plan.status === 'Pending';
-    } else if (user.role === 'Manager') {
-      // Managers see plans that are approved by team lead but not by manager yet
+    const userProjectMember = projectMembers.find(
+      member => member.projectId === plan.projectId && member.userId === user.id
+    );
+    
+    if (!userProjectMember) return false;
+    
+    if (userProjectMember.role === 'Manager' || userProjectMember.isTemporaryManager) {
       const hasTeamLeadApproval = plan.approvals?.some(
         a => a.role === 'Team Lead' && a.status === 'Approved'
       );
       const hasManagerDecision = plan.approvals?.some(
-        a => a.role === 'Manager'
+        a => (a.role === 'Manager' || a.role === 'Temporary Manager')
       );
       return hasTeamLeadApproval && !hasManagerDecision;
+    } else if (userProjectMember.role === 'Team Lead' && !userProjectMember.isTemporaryManager) {
+      return plan.status === 'Pending' && plan.projectId === userProjectMember.projectId;
     }
     return false;
   }) : [];
 
-  // Function to create a new plan
-  const createPlan = (date: string, deliverables: Deliverable[]) => {
+  const createPlan = (projectId: number, date: string, deliverables: Deliverable[]) => {
     if (!user) return;
+    
+    const isMember = projectMembers.some(
+      member => member.projectId === projectId && member.userId === user.id
+    );
+    
+    if (!isMember) {
+      toast.error('You are not a member of this project');
+      return;
+    }
     
     const newPlan: Plan = {
       id: plans.length + 1,
       userId: user.id,
+      projectId,
       date,
       status: 'Pending',
       createdAt: new Date().toISOString(),
@@ -250,7 +363,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.success('Plan created successfully!');
   };
 
-  // Function to update an existing plan
   const updatePlan = (planId: number, status: PlanStatus, deliverables?: Deliverable[]) => {
     setPlans(plans.map(plan => {
       if (plan.id === planId) {
@@ -266,9 +378,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.success('Plan updated successfully!');
   };
 
-  // Function to approve or reject a plan
   const approvePlan = (planId: number, status: PlanStatus, comments?: string) => {
     if (!user) return;
+    
+    const plan = plans.find(p => p.id === planId);
+    if (!plan) return;
+    
+    const userProjectMember = projectMembers.find(
+      member => member.projectId === plan.projectId && member.userId === user.id
+    );
+    
+    if (!userProjectMember) {
+      toast.error('You are not a member of this project');
+      return;
+    }
+    
+    let approvalRole: 'Team Lead' | 'Manager' | 'Temporary Manager';
+    
+    if (userProjectMember.isTemporaryManager) {
+      approvalRole = 'Temporary Manager';
+    } else {
+      approvalRole = userProjectMember.role as 'Team Lead' | 'Manager';
+    }
     
     const updatedPlans = plans.map(plan => {
       if (plan.id === planId) {
@@ -276,7 +407,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: (plan.approvals?.length || 0) + 1,
           planId,
           approvedBy: user.id,
-          role: user.role as 'Team Lead' | 'Manager',
+          role: approvalRole,
           status: status as 'Approved' | 'Rejected' | 'Needs Rework',
           comments,
           timestamp: new Date().toISOString(),
@@ -296,11 +427,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.success(`Plan ${status.toLowerCase()} successfully!`);
   };
 
-  // Function to add a work log
   const addWorkLog = (planId: number, actualTime: number, unplannedWork?: string) => {
     if (!user) return;
     
-    // Update the plan with actual time values
     setPlans(plans.map(plan => {
       if (plan.id === planId) {
         return {
@@ -308,7 +437,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           updatedAt: new Date().toISOString(),
           deliverables: plan.deliverables.map(d => ({
             ...d,
-            actualTime: d.actualTime || 0, // Keep existing actual time
+            actualTime: d.actualTime || 0,
           }))
         };
       }
@@ -318,24 +447,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.success('Work log added successfully!');
   };
 
-  // Function to get a plan by ID
   const getPlanById = (planId: number) => {
     return plans.find(plan => plan.id === planId);
   };
 
-  // New function: Get plans for a date range
-  const getPlansForDateRange = (startDate: string, endDate: string) => {
+  const getPlansForDateRange = (startDate: string, endDate: string, projectId?: number) => {
     return plans.filter(plan => {
       const planDate = new Date(plan.date);
-      return planDate >= new Date(startDate) && planDate <= new Date(endDate);
+      const isInDateRange = planDate >= new Date(startDate) && planDate <= new Date(endDate);
+      return projectId ? isInDateRange && plan.projectId === projectId : isInDateRange;
     });
   };
 
-  // New function: Get work log summary
   const getWorkLogSummary = () => {
     const summary: { date: string; hoursLogged: number }[] = [];
     
-    // Group hours logged by date
     plans.forEach(plan => {
       const date = plan.date;
       const hoursLogged = plan.deliverables.reduce((sum, d) => sum + (d.actualTime || 0), 0);
@@ -351,7 +477,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return summary.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
 
-  // New function: Get user performance metrics
   const getUserPerformance = (userId?: number) => {
     const userPlanIds = userId 
       ? plans.filter(p => p.userId === userId).map(p => p.id)
@@ -377,11 +502,185 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { onTime, delayed, total: onTime + delayed };
   };
 
+  const createProject = (name: string, description: string) => {
+    if (!user) return;
+    
+    if (user.role !== 'Manager' && user.role !== 'Admin') {
+      toast.error('Only managers can create projects');
+      return;
+    }
+    
+    const newProject: Project = {
+      id: projects.length + 1,
+      name,
+      description,
+      managerId: user.id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    setProjects([...projects, newProject]);
+    
+    const newProjectMember: ProjectMember = {
+      id: projectMembers.length + 1,
+      projectId: newProject.id,
+      userId: user.id,
+      role: 'Manager',
+      isTemporaryManager: false,
+      assignedAt: new Date().toISOString(),
+    };
+    
+    setProjectMembers([...projectMembers, newProjectMember]);
+    toast.success('Project created successfully!');
+  };
+
+  const addProjectMember = (projectId: number, userId: number, role: UserRole) => {
+    if (!user) return;
+    
+    const isManagerOrAdmin = user.role === 'Manager' || user.role === 'Admin';
+    
+    const isProjectManager = projects.some(p => p.id === projectId && p.managerId === user.id);
+    
+    const isAlreadyMember = projectMembers.some(
+      member => member.projectId === projectId && member.userId === userId
+    );
+    
+    if (!isManagerOrAdmin && !isProjectManager) {
+      toast.error('Only managers can add members to projects');
+      return;
+    }
+    
+    if (isAlreadyMember) {
+      toast.error('User is already a member of this project');
+      return;
+    }
+    
+    const newProjectMember: ProjectMember = {
+      id: projectMembers.length + 1,
+      projectId,
+      userId,
+      role,
+      isTemporaryManager: false,
+      assignedAt: new Date().toISOString(),
+    };
+    
+    setProjectMembers([...projectMembers, newProjectMember]);
+    toast.success('Project member added successfully!');
+  };
+
+  const removeProjectMember = (projectMemberId: number) => {
+    if (!user) return;
+    
+    const memberToRemove = projectMembers.find(member => member.id === projectMemberId);
+    
+    if (!memberToRemove) {
+      toast.error('Project member not found');
+      return;
+    }
+    
+    const isManagerOrAdmin = user.role === 'Manager' || user.role === 'Admin';
+    
+    const isProjectManager = projects.some(
+      p => p.id === memberToRemove.projectId && p.managerId === user.id
+    );
+    
+    if (!isManagerOrAdmin && !isProjectManager) {
+      toast.error('Only managers can remove members from projects');
+      return;
+    }
+    
+    const project = projects.find(p => p.id === memberToRemove.projectId);
+    if (project && memberToRemove.userId === project.managerId) {
+      toast.error('Cannot remove the project manager');
+      return;
+    }
+    
+    const updatedProjectMembers = projectMembers.filter(member => member.id !== projectMemberId);
+    setProjectMembers(updatedProjectMembers);
+    toast.success('Project member removed successfully!');
+  };
+
+  const assignTemporaryManager = (projectId: number, userId: number, isTemporary: boolean) => {
+    if (!user) return;
+    
+    const isManagerOrAdmin = user.role === 'Manager' || user.role === 'Admin';
+    
+    const isProjectManager = projects.some(p => p.id === projectId && p.managerId === user.id);
+    
+    if (!isManagerOrAdmin && !isProjectManager) {
+      toast.error('Only managers can assign temporary manager status');
+      return;
+    }
+    
+    const memberIndex = projectMembers.findIndex(
+      member => member.projectId === projectId && member.userId === userId
+    );
+    
+    if (memberIndex === -1) {
+      toast.error('User is not a member of this project');
+      return;
+    }
+    
+    if (projectMembers[memberIndex].role !== 'Team Lead') {
+      toast.error('Only team leads can be assigned as temporary managers');
+      return;
+    }
+    
+    const updatedProjectMembers = [...projectMembers];
+    updatedProjectMembers[memberIndex] = {
+      ...updatedProjectMembers[memberIndex],
+      isTemporaryManager: isTemporary,
+    };
+    
+    setProjectMembers(updatedProjectMembers);
+    toast.success(`Temporary manager status ${isTemporary ? 'assigned' : 'removed'} successfully!`);
+  };
+
+  const getProjectById = (projectId: number) => {
+    return projects.find(project => project.id === projectId);
+  };
+
+  const getProjectMembers = (projectId: number) => {
+    return projectMembers.filter(member => member.projectId === projectId);
+  };
+
+  const getUsersByProject = (projectId: number) => {
+    const members = getProjectMembers(projectId);
+    const users: User[] = [];
+    
+    for (const member of members) {
+      const mockUsers: User[] = [
+        { id: 1, name: 'John Manager', email: 'manager@example.com', role: 'Manager' },
+        { id: 2, name: 'Jane Team Lead', email: 'teamlead@example.com', role: 'Team Lead' },
+        { id: 3, name: 'Bob Developer', email: 'sde@example.com', role: 'SDE' },
+        { id: 4, name: 'Alice Junior Dev', email: 'jsde@example.com', role: 'JSDE' },
+        { id: 5, name: 'Charlie Intern', email: 'intern@example.com', role: 'Intern' },
+      ];
+      
+      const foundUser = mockUsers.find(u => u.id === member.userId);
+      if (foundUser) {
+        users.push({
+          ...foundUser,
+          role: member.isTemporaryManager ? 'Temporary Manager' : foundUser.role,
+        });
+      }
+    }
+    
+    return users;
+  };
+
+  const getTeamPlans = (projectId: number) => {
+    return plans.filter(plan => plan.projectId === projectId);
+  };
+
   return (
     <DataContext.Provider value={{
       plans,
       userPlans,
       pendingApprovalPlans,
+      projects,
+      userProjects,
+      projectMembers,
       createPlan,
       updatePlan,
       approvePlan,
@@ -389,7 +688,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       getPlanById,
       getPlansForDateRange,
       getWorkLogSummary,
-      getUserPerformance
+      getUserPerformance,
+      createProject,
+      addProjectMember,
+      removeProjectMember,
+      assignTemporaryManager,
+      getProjectById,
+      getProjectMembers,
+      getUsersByProject,
+      getTeamPlans
     }}>
       {children}
     </DataContext.Provider>

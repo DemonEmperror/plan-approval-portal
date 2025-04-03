@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/types';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { LogOut, User, ChevronRight, Settings } from 'lucide-react';
+import { LogOut, User, ChevronRight, Settings, FolderOpen } from 'lucide-react';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -23,13 +23,16 @@ const getRoleBasedLinks = (role: UserRole) => {
     case 'Manager':
       return [
         { name: 'Dashboard', path: '/dashboard' },
+        { name: 'Projects', path: '/projects' },
         { name: 'Approvals', path: '/approvals' },
         { name: 'Reports', path: '/reports' },
         { name: 'Users', path: '/users' },
       ];
     case 'Team Lead':
+    case 'Temporary Manager':
       return [
         { name: 'Dashboard', path: '/dashboard' },
+        { name: 'Projects', path: '/projects' },
         { name: 'My Plans', path: '/my-plans' },
         { name: 'Approvals', path: '/approvals' },
         { name: 'Reports', path: '/reports' },
@@ -39,12 +42,14 @@ const getRoleBasedLinks = (role: UserRole) => {
     case 'Intern':
       return [
         { name: 'Dashboard', path: '/dashboard' },
+        { name: 'Projects', path: '/projects' },
         { name: 'My Plans', path: '/my-plans' },
         { name: 'Create Plan', path: '/create-plan' },
       ];
     case 'Admin':
       return [
         { name: 'Dashboard', path: '/dashboard' },
+        { name: 'Projects', path: '/projects' },
         { name: 'Users', path: '/users' },
         { name: 'Settings', path: '/settings' },
       ];
@@ -66,7 +71,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     );
   }
   
-  const links = getRoleBasedLinks(user.role);
+  // If user is a temporary manager in any project, add temporary manager role
+  const effectiveRole = user.role === 'Team Lead' && user.projects?.some(p => p.isTemporaryManager)
+    ? 'Temporary Manager'
+    : user.role;
+  
+  const links = getRoleBasedLinks(effectiveRole);
 
   const handleLogout = () => {
     logout();
@@ -97,7 +107,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <DropdownMenuLabel>
                     <div className="flex flex-col">
                       <span>{user.name}</span>
-                      <span className="text-xs text-poa-gray-500">{user.role}</span>
+                      <span className="text-xs text-poa-gray-500">{effectiveRole}</span>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -148,6 +158,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       : 'text-poa-gray-700 hover:bg-poa-gray-100'
                   }`}
                 >
+                  {link.name === 'Projects' && <FolderOpen className="mr-2 h-4 w-4" />}
                   {link.name}
                 </Link>
               ))}
