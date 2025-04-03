@@ -205,7 +205,7 @@ const Users = () => {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={u.isActive ? "success" : "outline"}>
+                      <Badge variant={u.isActive ? "secondary" : "outline"}>
                         {u.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                     </TableCell>
