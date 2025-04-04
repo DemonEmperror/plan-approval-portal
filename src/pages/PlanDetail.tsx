@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useData } from '@/context/DataContext';
@@ -66,7 +65,6 @@ const PlanDetail = () => {
       // Preserve existing deliverable data if it exists, otherwise create new
       const existingDeliverable = plan.deliverables[index] || {};
       return {
-        ...existingDeliverable,
         id: existingDeliverable.id || plan.deliverables.length + index + 1,
         description: d.description,
         estimatedTime: d.estimatedTime,

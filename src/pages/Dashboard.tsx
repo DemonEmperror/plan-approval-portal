@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { useData } from '@/context/DataContext';
@@ -6,6 +7,7 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, BarChart, Bar, Tooltip, Legend } from 'recharts';
 import { Plan, User, Project } from '@/types';
 import { useNavigate } from 'react-router-dom';
