@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useData } from '@/context/DataContext';
@@ -62,16 +63,17 @@ const PlanDetail = () => {
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     // Map form values to update the plan
     const updatedDeliverables: Deliverable[] = values.deliverables.map((d, index) => {
-      // Preserve existing deliverable data if it exists, otherwise create new
-      const existingDeliverable = plan.deliverables[index] || {};
+      // Get existing deliverable if it exists
+      const existingDeliverable = index < plan.deliverables.length ? plan.deliverables[index] : null;
+      
       return {
-        id: existingDeliverable.id || plan.deliverables.length + index + 1,
+        id: existingDeliverable ? existingDeliverable.id : plan.deliverables.length + index + 1,
         description: d.description,
         estimatedTime: d.estimatedTime,
-        actualTime: existingDeliverable.actualTime || 0,
-        overflowHours: existingDeliverable.overflowHours || 0,
-        rework: existingDeliverable.rework || 'No',
-        achieved: existingDeliverable.achieved || 'None',
+        actualTime: existingDeliverable ? existingDeliverable.actualTime || 0 : 0,
+        overflowHours: existingDeliverable ? existingDeliverable.overflowHours : 0,
+        rework: existingDeliverable ? existingDeliverable.rework : 'None',
+        achieved: existingDeliverable ? existingDeliverable.achieved : 'None',
       };
     });
     
