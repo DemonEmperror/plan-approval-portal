@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DataProvider } from "@/context/DataContext";
 
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import MyPlans from "./pages/MyPlans";
 import CreatePlan from "./pages/CreatePlan";
@@ -39,6 +40,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/my-plans" element={<ProtectedRoute><MyPlans /></ProtectedRoute>} />
       <Route path="/create-plan" element={<ProtectedRoute><CreatePlan /></ProtectedRoute>} />

@@ -29,9 +29,10 @@ interface DataContextType {
   users: User[];
   getAllUsers: () => User[];
   getUserById: (userId: number) => User | undefined;
-  createUser: (name: string, email: string, role: UserRole) => void;
+  createUser: (name: string, email: string, role: UserRole, password: string) => void;
   updateUser: (userId: number, updates: Partial<User>) => void;
   toggleUserActiveStatus: (userId: number) => void;
+  registerUser: (name: string, email: string, password: string) => boolean;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -308,7 +309,7 @@ const initialUsers: User[] = [
 ];
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, addUserToAuth } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([...initialPlans, ...morePlans]);
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>(initialProjectMembers);
@@ -684,7 +685,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return users.find(u => u.id === userId);
   };
 
-  const createUser = (name: string, email: string, role: UserRole) => {
+  const createUser = (name: string, email: string, role: UserRole, password: string) => {
     if (!user) return;
     
     if (user.role !== 'Admin') {
@@ -708,7 +709,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     
     setUsers([...users, newUser]);
+    addUserToAuth(newUser, password);
     toast.success('User created successfully!');
+  };
+
+  const registerUser = (name: string, email: string, password: string): boolean => {
+    if (users.some(u => u.email === email)) {
+      toast.error('User with this email already exists');
+      return false;
+    }
+    
+    const newUser: User = {
+      id: users.length + 1,
+      name,
+      email,
+      role: 'JSDE',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    setUsers(prev => [...prev, newUser]);
+    addUserToAuth(newUser, password);
+    toast.success('Registration successful! You can now login.');
+    return true;
   };
 
   const updateUser = (userId: number, updates: Partial<User>) => {
@@ -792,6 +816,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createUser,
       updateUser,
       toggleUserActiveStatus,
+      registerUser,
     }}>
       {children}
     </DataContext.Provider>

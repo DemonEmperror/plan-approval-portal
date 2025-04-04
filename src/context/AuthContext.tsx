@@ -7,6 +7,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
+  addUserToAuth: (user: User, password: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -69,8 +70,19 @@ const mockUsers: User[] = [
   },
 ];
 
+// Mock passwords store
+const userPasswords: Record<string, string> = {
+  'manager@example.com': 'password',
+  'teamlead@example.com': 'password',
+  'sde@example.com': 'password',
+  'jsde@example.com': 'password',
+  'intern@example.com': 'password',
+  'admin@example.com': 'password',
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [authUsers, setAuthUsers] = useState<User[]>(mockUsers);
 
   useEffect(() => {
     // Check for saved user in localStorage on initial load
@@ -80,11 +92,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const addUserToAuth = (newUser: User, password: string) => {
+    // In a real app, this would securely hash the password
+    userPasswords[newUser.email] = password;
+    setAuthUsers(prev => [...prev, newUser]);
+  };
+
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Mock authentication - In a real app, this would be an API call
-    const foundUser = mockUsers.find(u => u.email === email);
+    // Check if user exists in our auth system
+    const foundUser = authUsers.find(u => u.email === email);
     
-    if (foundUser && password === 'password') { // Simple password check for demo
+    // Verify password
+    if (foundUser && userPasswords[email] === password) {
       setUser(foundUser);
       localStorage.setItem('poa_user', JSON.stringify(foundUser));
       return true;
@@ -102,7 +121,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user, 
       login, 
       logout, 
-      isAuthenticated: !!user 
+      isAuthenticated: !!user,
+      addUserToAuth
     }}>
       {children}
     </AuthContext.Provider>

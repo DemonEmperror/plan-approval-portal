@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useData } from '@/context/DataContext';
 import { useAuth } from '@/context/AuthContext';
-import { User, UserRole } from '@/types';
+import { User, UserRole, Project } from '@/types';
 import Layout from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { PlusCircle, UserCog, Check, X, Users as UsersIcon } from 'lucide-react';
+import { PlusCircle, UserCog, Check, X, Users as UsersIcon, Clock } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -26,29 +26,34 @@ const formSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email address.",
   }),
+  password: z.string().min(6, {
+    message: "Password must be at least 6 characters.",
+  }),
   role: z.enum(['Manager', 'Team Lead', 'SDE', 'JSDE', 'Intern', 'Admin']),
 });
 
 const Users = () => {
-  const { users, createUser, toggleUserActiveStatus, addProjectMember } = useData();
+  const { users, createUser, toggleUserActiveStatus, addProjectMember, assignTemporaryManager } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
-  const { userProjects } = useData();
+  const [isTemporaryManagerDialogOpen, setIsTemporaryManagerDialogOpen] = useState(false);
+  const { userProjects, projects } = useData();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       email: "",
+      password: "",
       role: "SDE",
     },
   });
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    createUser(values.name, values.email, values.role as UserRole);
+    createUser(values.name, values.email, values.role as UserRole, values.password);
     setIsCreateDialogOpen(false);
     form.reset();
   };
@@ -62,11 +67,30 @@ const Users = () => {
     setIsAssignDialogOpen(true);
   };
 
+  const handleTemporaryManagerAssignment = (userId: number) => {
+    const selectedUser = users.find(u => u.id === userId);
+    if (selectedUser && selectedUser.role === 'Team Lead') {
+      setSelectedUser(selectedUser);
+      setIsTemporaryManagerDialogOpen(true);
+    } else {
+      toast.error('Only Team Leads can be assigned as temporary managers');
+    }
+  };
+
   const assignToProject = (projectId: number, userRole: UserRole) => {
     if (selectedUser) {
       addProjectMember(projectId, selectedUser.id, userRole);
       setIsAssignDialogOpen(false);
       setSelectedUser(null);
+    }
+  };
+
+  const assignAsTemporaryManager = (projectId: number, isTemporary: boolean) => {
+    if (selectedUser) {
+      assignTemporaryManager(projectId, selectedUser.id, isTemporary);
+      setIsTemporaryManagerDialogOpen(false);
+      setSelectedUser(null);
+      toast.success(`${selectedUser.name} ${isTemporary ? 'assigned as' : 'removed from'} temporary manager role`);
     }
   };
 
@@ -130,6 +154,19 @@ const Users = () => {
                           <FormLabel>Email</FormLabel>
                           <FormControl>
                             <Input placeholder="john.doe@example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="******" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -230,6 +267,15 @@ const Users = () => {
                             <UserCog className="h-4 w-4" />
                           </Button>
                         )}
+                        {(user.role === 'Admin' || user.role === 'Manager') && u.role === 'Team Lead' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleTemporaryManagerAssignment(u.id)}
+                          >
+                            <Clock className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -264,6 +310,44 @@ const Users = () => {
                         <SelectItem key={project.id} value={project.id.toString()}>
                           {project.name}
                         </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {selectedUser && (
+          <Dialog open={isTemporaryManagerDialogOpen} onOpenChange={setIsTemporaryManagerDialogOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Assign Temporary Manager</DialogTitle>
+                <DialogDescription>
+                  Assign {selectedUser.name} as a temporary manager for a project.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Select Project</label>
+                  <Select onValueChange={(value) => {
+                    const [projectId, action] = value.split(':');
+                    assignAsTemporaryManager(parseInt(projectId), action === 'assign');
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a project and action" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((project) => (
+                        <React.Fragment key={project.id}>
+                          <SelectItem value={`${project.id}:assign`}>
+                            Assign to {project.name}
+                          </SelectItem>
+                          <SelectItem value={`${project.id}:remove`}>
+                            Remove from {project.name}
+                          </SelectItem>
+                        </React.Fragment>
                       ))}
                     </SelectContent>
                   </Select>

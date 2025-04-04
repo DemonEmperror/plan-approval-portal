@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,12 +80,22 @@ const Login = () => {
               {loading ? 'Logging in...' : 'Log in'}
             </Button>
           </form>
+
+          <div className="mt-4 text-center">
+            <p className="text-sm text-poa-gray-600">
+              Don't have an account?{" "}
+              <Link to="/register" className="text-poa-blue-600 hover:underline">
+                Register
+              </Link>
+            </p>
+          </div>
           
           <div className="mt-6 text-center text-sm">
             <p className="text-poa-gray-600">
               Demo accounts (use password: "password")
             </p>
             <div className="mt-2 space-y-1">
+              <p className="text-poa-blue-600">admin@example.com (Admin)</p>
               <p className="text-poa-blue-600">manager@example.com (Manager)</p>
               <p className="text-poa-blue-600">teamlead@example.com (Team Lead)</p>
               <p className="text-poa-blue-600">sde@example.com (SDE)</p>
