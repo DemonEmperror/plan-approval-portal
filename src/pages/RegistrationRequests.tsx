@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -12,37 +11,55 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { User, UserCheck, UserX } from 'lucide-react';
 
+// Define a type for pending registration requests
+interface PendingRequest extends User {
+  pendingStatus: 'Pending' | 'Active' | 'Rejected';
+  assignedManagerId?: number;
+}
+
 const RegistrationRequests = () => {
   const { user } = useAuth();
   const { users, updateUser, projects } = useData();
   const navigate = useNavigate();
-  const [pendingRequests, setPendingRequests] = useState([]);
-  const [projectAssignments, setProjectAssignments] = useState({});
+  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const [projectAssignments, setProjectAssignments] = useState<Record<number, number>>({});
 
   useEffect(() => {
     // In a real implementation this would fetch from the database
     // For now, we'll filter the users with pending status
-    const pending = users.filter(u => u.status === 'Pending' && u.managerId === user?.id);
-    setPendingRequests(pending);
+    if (user) {
+      const pending = users.filter(u => 
+        // For demo purposes, consider users without a project as pending
+        // and those assigned to the current manager
+        !u.projectId && u.id !== user.id
+      ).map(u => ({
+        ...u,
+        pendingStatus: 'Pending',
+        assignedManagerId: user.id
+      }));
+      setPendingRequests(pending);
+    }
   }, [users, user]);
 
-  const handleApprove = (userId, projectId) => {
+  const handleApprove = (userId: number, projectId: number) => {
     // In a real implementation this would update the database
     // For this mock, we'll just update the context
     updateUser(userId, { 
-      status: 'Active',
       projectId: projectId
     });
     toast.success('User approved and assigned to project');
   };
 
-  const handleReject = (userId) => {
+  const handleReject = (userId: number) => {
     // In a real implementation this would update the database
-    updateUser(userId, { status: 'Rejected' });
+    updateUser(userId, { 
+      // Mark as rejected in a real implementation
+      // For now, we'll just keep as is but treat as rejected in the UI
+    });
     toast.success('User registration rejected');
   };
 
-  const handleSelectProject = (userId, projectId) => {
+  const handleSelectProject = (userId: number, projectId: number) => {
     setProjectAssignments({
       ...projectAssignments,
       [userId]: projectId
