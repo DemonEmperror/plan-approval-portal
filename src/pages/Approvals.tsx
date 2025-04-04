@@ -6,16 +6,25 @@ import { useData } from '@/context/DataContext';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Clock } from 'lucide-react';
+import { FileText, Clock, AlertTriangle } from 'lucide-react';
 
 const Approvals = () => {
   const { user } = useAuth();
   const { pendingApprovalPlans } = useData();
   const navigate = useNavigate();
   
-  if (!user || (user.role !== 'Manager' && user.role !== 'Team Lead')) {
-    navigate('/');
-    return null;
+  // Only managers can approve plans now
+  if (!user || user.role !== 'Manager') {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center h-[60vh]">
+          <AlertTriangle className="h-16 w-16 text-yellow-500 mb-4" />
+          <h2 className="text-2xl font-bold text-poa-gray-700">Access Restricted</h2>
+          <p className="text-poa-gray-500 mt-2 mb-6">Only managers can approve plans.</p>
+          <Button onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
+        </div>
+      </Layout>
+    );
   }
   
   // Sort plans by date (newest first)
