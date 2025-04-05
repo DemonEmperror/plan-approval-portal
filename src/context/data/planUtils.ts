@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Plan, Deliverable, PlanStatus, Approval, User } from '@/types';
 import { toast } from 'sonner';
@@ -30,7 +31,9 @@ export const usePlanUtils = (
       const hasTeamLeadDecision = plan.approvals?.some(
         a => a.role === 'Team Lead'
       );
-      const isTeamMemberPlan = plan.userId !== user.id && plan.projectId === userProjectMember.projectId;
+      // Fix: we don't need to check projectId on userProjectMember since we already filtered by project
+      // when calling getProjectMembers(plan.projectId)
+      const isTeamMemberPlan = plan.userId !== user.id;
       return plan.status === 'Pending' && !hasTeamLeadDecision && isTeamMemberPlan;
     }
     return false;
