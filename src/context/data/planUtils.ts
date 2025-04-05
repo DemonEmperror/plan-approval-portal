@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Plan, Deliverable, PlanStatus, Approval, User } from '@/types';
 import { toast } from 'sonner';
@@ -26,12 +25,13 @@ export const usePlanUtils = (
       const hasManagerDecision = plan.approvals?.some(
         a => (a.role === 'Manager' || a.role === 'Temporary Manager')
       );
-      return hasTeamLeadApproval && !hasManagerDecision;
-    } else if (userProjectMember.role === 'Team Lead' && !userProjectMember.isTemporaryManager) {
+      return plan.status === 'Pending' && hasTeamLeadApproval && !hasManagerDecision;
+    } else if (userProjectMember.role === 'Team Lead') {
       const hasTeamLeadDecision = plan.approvals?.some(
         a => a.role === 'Team Lead'
       );
-      return plan.status === 'Pending' && !hasTeamLeadDecision && plan.projectId === userProjectMember.userId;
+      const isTeamMemberPlan = plan.userId !== user.id && plan.projectId === userProjectMember.projectId;
+      return plan.status === 'Pending' && !hasTeamLeadDecision && isTeamMemberPlan;
     }
     return false;
   }) : [];
@@ -137,7 +137,9 @@ export const usePlanUtils = (
     
     let statusMessage = '';
     if (approvalRole === 'Team Lead') {
-      statusMessage = status === 'Approved' ? 'approved by Team Lead and sent to Manager' : status.toLowerCase();
+      statusMessage = status === 'Approved' 
+        ? 'approved by Team Lead and forwarded to Manager for final approval' 
+        : status.toLowerCase();
     } else {
       statusMessage = status.toLowerCase();
     }

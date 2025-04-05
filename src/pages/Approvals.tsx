@@ -10,7 +10,7 @@ import { FileText, Clock, AlertTriangle } from 'lucide-react';
 
 const Approvals = () => {
   const { user } = useAuth();
-  const { pendingApprovalPlans } = useData();
+  const { pendingApprovalPlans, projects } = useData();
   const navigate = useNavigate();
   
   // If user is not logged in or is not a manager or team lead, show restricted access
@@ -41,64 +41,72 @@ const Approvals = () => {
         
         <div className="bg-white rounded-lg shadow-sm border border-poa-gray-200">
           <div className="p-4 border-b border-poa-gray-200">
-            <h2 className="font-semibold">All Pending Plans</h2>
+            <h2 className="font-semibold">
+              {user.role === 'Team Lead' ? 'Plans Requiring Team Lead Review' : 'Plans Requiring Manager Review'}
+            </h2>
           </div>
           
           {sortedPlans.length > 0 ? (
             <div className="divide-y divide-poa-gray-200">
-              {sortedPlans.map((plan) => (
-                <div 
-                  key={plan.id} 
-                  className="p-4 hover:bg-poa-gray-50 transition-colors cursor-pointer"
-                  onClick={() => navigate(`/plan/${plan.id}`)}
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex items-start">
-                      <FileText className="h-5 w-5 text-poa-blue-500 mr-3 mt-0.5" />
-                      <div>
-                        <h3 className="font-medium">
-                          Plan #{plan.id} - {plan.user?.name || `User #${plan.userId}`}
-                        </h3>
-                        <p className="text-sm text-poa-gray-600 mt-1">
-                          {plan.deliverables.length} deliverables - Date: {new Date(plan.date).toLocaleDateString()}
-                        </p>
-                        <div className="mt-1">
-                          {user.role === 'Manager' && plan.approvals?.some(a => a.role === 'Team Lead' && a.status === 'Approved') && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                              Team Lead Approved
-                            </Badge>
-                          )}
-                          {user.role === 'Team Lead' && !plan.approvals?.some(a => a.role === 'Team Lead') && (
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                              Needs Team Lead Review
-                            </Badge>
-                          )}
+              {sortedPlans.map((plan) => {
+                const project = projects.find(p => p.id === plan.projectId);
+                return (
+                  <div 
+                    key={plan.id} 
+                    className="p-4 hover:bg-poa-gray-50 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/plan/${plan.id}`)}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-start">
+                        <FileText className="h-5 w-5 text-poa-blue-500 mr-3 mt-0.5" />
+                        <div>
+                          <h3 className="font-medium">
+                            Plan #{plan.id} - {plan.user?.name || `User #${plan.userId}`}
+                          </h3>
+                          <p className="text-sm text-poa-gray-600 mt-1">
+                            {plan.deliverables.length} deliverables - Date: {new Date(plan.date).toLocaleDateString()}
+                          </p>
+                          <p className="text-sm text-poa-gray-600">
+                            Project: {project?.name || `Project #${plan.projectId}`}
+                          </p>
+                          <div className="mt-1">
+                            {user.role === 'Manager' && plan.approvals?.some(a => a.role === 'Team Lead' && a.status === 'Approved') && (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                Team Lead Approved
+                              </Badge>
+                            )}
+                            {user.role === 'Team Lead' && !plan.approvals?.some(a => a.role === 'Team Lead') && (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                Needs Team Lead Review
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 text-poa-gray-500 mr-1" />
-                        <span className="text-xs text-poa-gray-600">
-                          Submitted {new Date(plan.createdAt).toLocaleString()}
-                        </span>
-                      </div>
                       
-                      <Button 
-                        size="sm" 
-                        className="bg-poa-blue-600 hover:bg-poa-blue-700"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/plan/${plan.id}`);
-                        }}
-                      >
-                        Review
-                      </Button>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <div className="flex items-center">
+                          <Clock className="h-4 w-4 text-poa-gray-500 mr-1" />
+                          <span className="text-xs text-poa-gray-600">
+                            Submitted {new Date(plan.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                        
+                        <Button 
+                          size="sm" 
+                          className="bg-poa-blue-600 hover:bg-poa-blue-700"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/plan/${plan.id}`);
+                          }}
+                        >
+                          Review
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="p-8 text-center">
