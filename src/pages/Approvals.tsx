@@ -13,14 +13,14 @@ const Approvals = () => {
   const { pendingApprovalPlans } = useData();
   const navigate = useNavigate();
   
-  // Only managers can approve plans now
-  if (!user || user.role !== 'Manager') {
+  // If user is not logged in or is not a manager or team lead, show restricted access
+  if (!user || (user.role !== 'Manager' && user.role !== 'Team Lead')) {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center h-[60vh]">
           <AlertTriangle className="h-16 w-16 text-yellow-500 mb-4" />
           <h2 className="text-2xl font-bold text-poa-gray-700">Access Restricted</h2>
-          <p className="text-poa-gray-500 mt-2 mb-6">Only managers can approve plans.</p>
+          <p className="text-poa-gray-500 mt-2 mb-6">Only managers and team leads can approve plans.</p>
           <Button onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
         </div>
       </Layout>
@@ -62,6 +62,18 @@ const Approvals = () => {
                         <p className="text-sm text-poa-gray-600 mt-1">
                           {plan.deliverables.length} deliverables - Date: {new Date(plan.date).toLocaleDateString()}
                         </p>
+                        <div className="mt-1">
+                          {user.role === 'Manager' && plan.approvals?.some(a => a.role === 'Team Lead' && a.status === 'Approved') && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              Team Lead Approved
+                            </Badge>
+                          )}
+                          {user.role === 'Team Lead' && !plan.approvals?.some(a => a.role === 'Team Lead') && (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                              Needs Team Lead Review
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                     

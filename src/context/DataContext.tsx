@@ -337,7 +337,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
       return hasTeamLeadApproval && !hasManagerDecision;
     } else if (userProjectMember.role === 'Team Lead' && !userProjectMember.isTemporaryManager) {
-      return plan.status === 'Pending' && plan.projectId === userProjectMember.projectId;
+      const hasTeamLeadDecision = plan.approvals?.some(
+        a => a.role === 'Team Lead'
+      );
+      return plan.status === 'Pending' && !hasTeamLeadDecision && plan.projectId === userProjectMember.projectId;
     }
     return false;
   }) : [];
@@ -425,9 +428,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           timestamp: new Date().toISOString(),
         };
         
+        const newStatus = (approvalRole === 'Manager' || approvalRole === 'Temporary Manager') 
+          ? status
+          : 'Pending';
+        
         return {
           ...plan,
-          status,
+          status: newStatus,
           updatedAt: new Date().toISOString(),
           approvals: [...(plan.approvals || []), newApproval]
         };
@@ -436,7 +443,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     
     setPlans(updatedPlans);
-    toast.success(`Plan ${status.toLowerCase()} successfully!`);
+    
+    let statusMessage = '';
+    if (approvalRole === 'Team Lead') {
+      statusMessage = status === 'Approved' ? 'approved by Team Lead and sent to Manager' : status.toLowerCase();
+    } else {
+      statusMessage = status.toLowerCase();
+    }
+    
+    toast.success(`Plan ${statusMessage} successfully!`);
   };
 
   const addWorkLog = (planId: number, actualTime: number, unplannedWork?: string) => {
