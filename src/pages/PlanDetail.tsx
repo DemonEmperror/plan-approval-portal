@@ -9,11 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle, XCircle, AlertCircle, Edit, CalendarDays } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Edit, CalendarDays, ThumbsUp, ThumbsDown, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -29,12 +30,19 @@ const formSchema = z.object({
   ).min(1, { message: "At least one deliverable is required" }),
 });
 
+// Add approval form schema
+const approvalFormSchema = z.object({
+  status: z.enum(['Approved', 'Rejected', 'Needs Rework']),
+  comments: z.string().optional()
+});
+
 const PlanDetail = () => {
   const { planId } = useParams();
   const navigate = useNavigate();
-  const { getPlanById, getProjectById, getUserById, updatePlan } = useData();
+  const { getPlanById, getProjectById, getUserById, updatePlan, approvePlan, getProjectMembers } = useData();
   const { user } = useAuth();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
   
   if (!planId || !user) {
     return <Layout>Invalid plan ID or user not authenticated</Layout>;
@@ -60,6 +68,15 @@ const PlanDetail = () => {
     },
   });
   
+  // Create form for approvals
+  const approvalForm = useForm<z.infer<typeof approvalFormSchema>>({
+    resolver: zodResolver(approvalFormSchema),
+    defaultValues: {
+      status: 'Approved',
+      comments: ''
+    },
+  });
+  
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     // Map form values to update the plan
     const updatedDeliverables: Deliverable[] = values.deliverables.map((d, index) => {
@@ -82,7 +99,38 @@ const PlanDetail = () => {
     setIsEditDialogOpen(false);
   };
   
+  // Handle plan approval
+  const onApproveSubmit = (values: z.infer<typeof approvalFormSchema>) => {
+    approvePlan(plan.id, values.status as PlanStatus, values.comments);
+    setIsApprovalDialogOpen(false);
+    // Navigate back to approvals page after submission
+    navigate('/approvals');
+  };
+  
   const canEditPlan = user.id === plan.userId && plan.status === 'Needs Rework';
+  
+  // Check if current user can approve this plan
+  const userProjectMember = getProjectMembers(plan.projectId).find(
+    member => member.userId === user.id
+  );
+  
+  const isTeamLead = userProjectMember?.role === 'Team Lead';
+  const isManager = userProjectMember?.role === 'Manager' || userProjectMember?.isTemporaryManager;
+  
+  const hasTeamLeadApproval = plan.approvals?.some(
+    a => a.role === 'Team Lead' && a.status === 'Approved'
+  );
+  
+  const hasTeamLeadDecision = plan.approvals?.some(
+    a => a.role === 'Team Lead'
+  );
+  
+  const hasManagerDecision = plan.approvals?.some(
+    a => (a.role === 'Manager' || a.role === 'Temporary Manager')
+  );
+  
+  const canApproveAsTeamLead = isTeamLead && plan.status === 'Pending' && !hasTeamLeadDecision && plan.userId !== user.id;
+  const canApproveAsManager = isManager && plan.status === 'Pending' && hasTeamLeadApproval && !hasManagerDecision;
   
   return (
     <Layout>
@@ -165,6 +213,91 @@ const PlanDetail = () => {
                       
                       <DialogFooter>
                         <Button type="submit">Save Changes</Button>
+                      </DialogFooter>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            )}
+
+            {/* Add approval buttons for team leads and managers */}
+            {(canApproveAsTeamLead || canApproveAsManager) && (
+              <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <ThumbsUp className="mr-2 h-4 w-4" />
+                    Review Plan
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px]">
+                  <DialogHeader>
+                    <DialogTitle>Review Plan</DialogTitle>
+                    <DialogDescription>
+                      {canApproveAsTeamLead 
+                        ? "As a Team Lead, your approval will forward this plan to a Manager for final review." 
+                        : "As a Manager, you will provide final approval or rejection for this plan."}
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <Form {...approvalForm}>
+                    <form onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="space-y-6">
+                      <FormField
+                        control={approvalForm.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Status</FormLabel>
+                            <div className="flex gap-3 pt-2">
+                              <Button 
+                                type="button"
+                                variant={field.value === 'Approved' ? 'default' : 'outline'}
+                                onClick={() => field.onChange('Approved')}
+                                className="flex-1"
+                              >
+                                <ThumbsUp className="mr-2 h-4 w-4" />
+                                Approve
+                              </Button>
+                              <Button 
+                                type="button"
+                                variant={field.value === 'Rejected' ? 'destructive' : 'outline'}
+                                onClick={() => field.onChange('Rejected')}
+                                className="flex-1"
+                              >
+                                <ThumbsDown className="mr-2 h-4 w-4" />
+                                Reject
+                              </Button>
+                              <Button 
+                                type="button"
+                                variant={field.value === 'Needs Rework' ? 'secondary' : 'outline'}
+                                onClick={() => field.onChange('Needs Rework')}
+                                className="flex-1"
+                              >
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Needs Rework
+                              </Button>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={approvalForm.control}
+                        name="comments"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Comments (optional)</FormLabel>
+                            <FormControl>
+                              <Textarea {...field} placeholder="Add any comments about your decision..." />
+                            </FormControl>
+                            <FormDescription>
+                              Provide feedback or reasons for your decision.
+                            </FormDescription>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <DialogFooter>
+                        <Button type="submit">Submit Review</Button>
                       </DialogFooter>
                     </form>
                   </Form>
