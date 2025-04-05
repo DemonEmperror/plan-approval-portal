@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -9,12 +10,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { User, UserCheck, UserX } from 'lucide-react';
+import { User as UserIcon, UserCheck, UserX } from 'lucide-react';
+import { User } from '@/types';
 
 // Define a type for pending registration requests
-interface PendingRequest extends User {
+interface PendingRequest {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
   pendingStatus: 'Pending' | 'Active' | 'Rejected';
   assignedManagerId?: number;
+  isActive?: boolean;
 }
 
 const RegistrationRequests = () => {
@@ -28,15 +35,17 @@ const RegistrationRequests = () => {
     // In a real implementation this would fetch from the database
     // For now, we'll filter the users with pending status
     if (user) {
-      const pending = users.filter(u => 
-        // For demo purposes, consider users without a project as pending
-        // and those assigned to the current manager
-        !u.projectId && u.id !== user.id
-      ).map(u => ({
-        ...u,
-        pendingStatus: 'Pending',
-        assignedManagerId: user.id
-      }));
+      const pending = users
+        .filter(u => !u.projects || u.projects.length === 0 && u.id !== user.id)
+        .map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          isActive: u.isActive,
+          pendingStatus: 'Pending' as const,
+          assignedManagerId: user.id
+        }));
       setPendingRequests(pending);
     }
   }, [users, user]);
@@ -45,7 +54,7 @@ const RegistrationRequests = () => {
     // In a real implementation this would update the database
     // For this mock, we'll just update the context
     updateUser(userId, { 
-      projectId: projectId
+      projects: [{ id: 0, projectId: projectId, userId: userId, role: 'JSDE', isTemporaryManager: false, assignedAt: new Date().toISOString() }]
     });
     toast.success('User approved and assigned to project');
   };
@@ -151,7 +160,7 @@ const RegistrationRequests = () => {
               </Table>
             ) : (
               <div className="p-8 text-center">
-                <User className="h-12 w-12 text-poa-gray-400 mx-auto mb-4" />
+                <UserIcon className="h-12 w-12 text-poa-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-poa-gray-900">No pending requests</h3>
                 <p className="mt-1 text-sm text-poa-gray-600">
                   All registration requests have been processed.
