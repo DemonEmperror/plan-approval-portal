@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useData } from '@/context/DataContext';
@@ -20,7 +19,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Deliverable, PlanStatus } from '@/types';
 
-// Define schema for validation
 const formSchema = z.object({
   deliverables: z.array(
     z.object({
@@ -30,7 +28,6 @@ const formSchema = z.object({
   ).min(1, { message: "At least one deliverable is required" }),
 });
 
-// Add approval form schema
 const approvalFormSchema = z.object({
   status: z.enum(['Approved', 'Rejected', 'Needs Rework']),
   comments: z.string().optional()
@@ -57,7 +54,6 @@ const PlanDetail = () => {
   const project = getProjectById(plan.projectId);
   const planUser = getUserById(plan.userId);
   
-  // Create form for editing plan
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -68,7 +64,6 @@ const PlanDetail = () => {
     },
   });
   
-  // Create form for approvals
   const approvalForm = useForm<z.infer<typeof approvalFormSchema>>({
     resolver: zodResolver(approvalFormSchema),
     defaultValues: {
@@ -78,10 +73,8 @@ const PlanDetail = () => {
   });
   
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    // Calculate total hours
     const totalHours = values.deliverables.reduce((sum, d) => sum + d.estimatedTime, 0);
     
-    // Check if total is exactly 8 hours
     if (totalHours !== 8) {
       form.setError('deliverables', { 
         type: 'custom', 
@@ -90,9 +83,7 @@ const PlanDetail = () => {
       return;
     }
     
-    // Map form values to update the plan
     const updatedDeliverables: Deliverable[] = values.deliverables.map((d, index) => {
-      // Get existing deliverable if it exists
       const existingDeliverable = index < plan.deliverables.length ? plan.deliverables[index] : null;
       
       return {
@@ -106,30 +97,22 @@ const PlanDetail = () => {
       };
     });
     
-    // Update plan with new deliverables
     const updated = updatePlan(plan.id, 'Pending', updatedDeliverables);
     if (updated) {
       setIsEditDialogOpen(false);
     }
   };
   
-  // Handle plan approval
   const onApproveSubmit = (values: z.infer<typeof approvalFormSchema>) => {
     approvePlan(plan.id, values.status as PlanStatus, values.comments);
     setIsApprovalDialogOpen(false);
-    // Navigate back to approvals page after submission
     navigate('/approvals');
   };
   
-  // Check if current user can edit this plan
-  // Can edit if:
-  // 1. User is the plan creator AND
-  // 2. Plan status is 'Needs Rework' OR it's a new plan in 'Pending' status
   const canEditPlan = user.id === plan.userId && 
     (plan.status === 'Needs Rework' || 
      (plan.status === 'Pending' && !plan.approvals?.some(a => a.role === 'Team Lead')));
   
-  // Check if current user can approve this plan
   const userProjectMember = getProjectMembers(plan.projectId).find(
     member => member.userId === user.id
   );
@@ -149,18 +132,8 @@ const PlanDetail = () => {
     a => (a.role === 'Manager' || a.role === 'Temporary Manager')
   );
   
-  // Team lead can approve if:
-  // 1. User is a team lead for this project
-  // 2. Plan is pending
-  // 3. There's no team lead decision yet
-  // 4. User is not the plan creator
   const canApproveAsTeamLead = isTeamLead && plan.status === 'Pending' && !hasTeamLeadDecision && plan.userId !== user.id;
   
-  // Manager can approve if:
-  // 1. User is a manager for this project
-  // 2. Plan is pending
-  // 3. Manager hasn't made a decision yet
-  // Note: Removing the requirement for team lead approval for managers to be able to see plans
   const canApproveAsManager = isManager && plan.status === 'Pending' && !hasManagerDecision;
   
   return (
@@ -198,7 +171,6 @@ const PlanDetail = () => {
                   
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                      {/* Show total hours warning */}
                       <div className="text-sm flex justify-between">
                         <span>Total planned hours:</span> 
                         <span className={
@@ -295,7 +267,6 @@ const PlanDetail = () => {
               </Dialog>
             )}
 
-            {/* Add approval buttons for team leads and managers */}
             {(canApproveAsTeamLead || canApproveAsManager) && (
               <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
                 <DialogTrigger asChild>
