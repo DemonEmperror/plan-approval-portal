@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useData } from '@/context/DataContext';
@@ -97,10 +98,9 @@ const PlanDetail = () => {
       };
     });
     
-    const updated = updatePlan(plan.id, 'Pending', updatedDeliverables);
-    if (updated) {
-      setIsEditDialogOpen(false);
-    }
+    // Fix: Don't check the result of updatePlan as a conditional
+    updatePlan(plan.id, 'Pending', updatedDeliverables);
+    setIsEditDialogOpen(false);
   };
   
   const onApproveSubmit = (values: z.infer<typeof approvalFormSchema>) => {
