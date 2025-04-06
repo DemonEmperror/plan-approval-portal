@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Plan, Deliverable, PlanStatus, Approval, User } from '@/types';
 import { toast } from 'sonner';
@@ -51,6 +50,34 @@ export const usePlanUtils = (
       return;
     }
     
+    // Validate total hours is exactly 8
+    const totalHours = deliverables.reduce((sum, d) => sum + d.estimatedTime, 0);
+    if (totalHours !== 8) {
+      toast.error('Total planned hours must be exactly 8 hours');
+      return;
+    }
+    
+    // Validate no task exceeds 3 hours
+    for (const deliverable of deliverables) {
+      if (deliverable.estimatedTime > 3) {
+        toast.error('Maximum 3 hours allowed per deliverable. Please break down larger tasks.');
+        return;
+      }
+    }
+    
+    // Check if plan is for today and if it's before 11 AM
+    const planDate = new Date(date);
+    const now = new Date();
+    if (
+      planDate.getFullYear() === now.getFullYear() &&
+      planDate.getMonth() === now.getMonth() &&
+      planDate.getDate() === now.getDate() &&
+      now.getHours() >= 11
+    ) {
+      toast.error('Plans for today must be submitted before 11:00 AM');
+      return;
+    }
+    
     const newPlan: Plan = {
       id: plans.length + 1,
       userId: user.id,
@@ -73,6 +100,24 @@ export const usePlanUtils = (
   };
 
   const updatePlan = (planId: number, status: PlanStatus, deliverables?: Deliverable[]) => {
+    // Check if updating a plan with deliverables (for plan edits)
+    if (deliverables) {
+      // Validate total hours is exactly 8
+      const totalHours = deliverables.reduce((sum, d) => sum + d.estimatedTime, 0);
+      if (totalHours !== 8) {
+        toast.error('Total planned hours must be exactly 8 hours');
+        return false;
+      }
+      
+      // Validate no task exceeds 3 hours
+      for (const deliverable of deliverables) {
+        if (deliverable.estimatedTime > 3) {
+          toast.error('Maximum 3 hours allowed per deliverable. Please break down larger tasks.');
+          return false;
+        }
+      }
+    }
+    
     setPlans(plans.map(plan => {
       if (plan.id === planId) {
         return {
@@ -85,6 +130,7 @@ export const usePlanUtils = (
       return plan;
     }));
     toast.success('Plan updated successfully!');
+    return true;
   };
 
   const approvePlan = (planId: number, status: PlanStatus, comments?: string) => {
@@ -153,6 +199,13 @@ export const usePlanUtils = (
   const addWorkLog = (planId: number, actualTime: number, unplannedWork?: string) => {
     if (!user) return;
     
+    // Check for 11 PM deadline for work logs
+    const now = new Date();
+    if (now.getHours() >= 23) {
+      toast.error('Work logs must be submitted before 11:00 PM');
+      return false;
+    }
+    
     setPlans(plans.map(plan => {
       if (plan.id === planId) {
         return {
@@ -168,6 +221,7 @@ export const usePlanUtils = (
     }));
     
     toast.success('Work log added successfully!');
+    return true;
   };
 
   const getPlanById = (planId: number) => {

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Trash2, Plus, Calendar } from 'lucide-react';
+import { Trash2, Plus, Calendar, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const CreatePlan = () => {
   const { user } = useAuth();
@@ -23,6 +24,10 @@ const CreatePlan = () => {
     userProjects.length > 0 ? userProjects[0].id : undefined
   );
   
+  // Time validation state
+  const [isSubmissionTimeValid, setIsSubmissionTimeValid] = useState(true);
+  const [submissionTimeError, setSubmissionTimeError] = useState('');
+  
   // Initial empty deliverable
   const initialDeliverable: Omit<Deliverable, 'id'> = {
     description: '',
@@ -33,6 +38,43 @@ const CreatePlan = () => {
   };
   
   const [deliverables, setDeliverables] = useState<Omit<Deliverable, 'id'>[]>([{...initialDeliverable}]);
+  
+  // Calculate total hours
+  const totalHours = deliverables.reduce((total, d) => total + (d.estimatedTime || 0), 0);
+  const isExactlyEightHours = totalHours === 8;
+  
+  // Effect to check time restrictions on component mount and when date changes
+  useEffect(() => {
+    checkTimeRestrictions();
+  }, [date]);
+  
+  // Function to check if current time meets submission requirements
+  const checkTimeRestrictions = () => {
+    const now = new Date();
+    const selectedDate = new Date(date);
+    
+    // Reset error state
+    setSubmissionTimeError('');
+    
+    // Check if selected date is today
+    if (selectedDate.toDateString() === now.toDateString()) {
+      const currentHour = now.getHours();
+      
+      // Plan submission cutoff at 11 AM
+      if (currentHour >= 11) {
+        setIsSubmissionTimeValid(false);
+        setSubmissionTimeError('Plans for today must be submitted before 11:00 AM');
+        return;
+      }
+    } else if (selectedDate < now) {
+      // Cannot create plans for past dates
+      setIsSubmissionTimeValid(false);
+      setSubmissionTimeError('Cannot create plans for past dates');
+      return;
+    }
+    
+    setIsSubmissionTimeValid(true);
+  };
   
   const addDeliverable = () => {
     setDeliverables([...deliverables, {...initialDeliverable}]);
@@ -46,10 +88,21 @@ const CreatePlan = () => {
   
   const updateDeliverable = (index: number, field: string, value: string | number | ReworkStatus | AchievedStatus) => {
     const newDeliverables = [...deliverables];
+    
+    // Enforce maximum 3 hours per task when updating estimated time
+    if (field === 'estimatedTime') {
+      const numValue = Number(value);
+      if (numValue > 3) {
+        toast.error('Maximum 3 hours allowed per deliverable. Please break down larger tasks.');
+        value = 3;
+      }
+    }
+    
     newDeliverables[index] = {
       ...newDeliverables[index],
       [field]: value
     };
+    
     setDeliverables(newDeliverables);
   };
   
@@ -72,6 +125,18 @@ const CreatePlan = () => {
       return;
     }
     
+    // Check if time restriction is valid
+    if (!isSubmissionTimeValid) {
+      toast.error(submissionTimeError);
+      return;
+    }
+    
+    // Validate total hours is exactly 8
+    if (!isExactlyEightHours) {
+      toast.error('Total planned hours must be exactly 8 hours');
+      return;
+    }
+    
     for (let i = 0; i < deliverables.length; i++) {
       if (!deliverables[i].description) {
         toast.error(`Please enter a description for deliverable #${i + 1}`);
@@ -80,6 +145,11 @@ const CreatePlan = () => {
       
       if (deliverables[i].estimatedTime <= 0) {
         toast.error(`Please enter a valid estimated time for deliverable #${i + 1}`);
+        return;
+      }
+      
+      if (deliverables[i].estimatedTime > 3) {
+        toast.error(`Deliverable #${i + 1} exceeds the 3-hour limit. Please break it down.`);
         return;
       }
     }
@@ -108,6 +178,28 @@ const CreatePlan = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Create Plan of Action</h1>
         </div>
+        
+        {!isSubmissionTimeValid && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Time Restriction</AlertTitle>
+            <AlertDescription>
+              {submissionTimeError}
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {!isExactlyEightHours && deliverables.some(d => d.estimatedTime > 0) && (
+          <Alert variant={totalHours < 8 ? "default" : "destructive"}>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Hours Planning</AlertTitle>
+            <AlertDescription>
+              {totalHours < 8 
+                ? `You need to plan ${(8 - totalHours).toFixed(1)} more hours to reach the required 8 hours` 
+                : `You've planned ${(totalHours - 8).toFixed(1)} hours too many. Total must be exactly 8 hours`}
+            </AlertDescription>
+          </Alert>
+        )}
         
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="bg-white p-6 rounded-lg shadow-sm border border-poa-gray-200">
@@ -218,11 +310,18 @@ const CreatePlan = () => {
                         <td className="px-4 py-3">
                           <Input 
                             type="number" 
-                            min="0" 
+                            min="0"
+                            max="3" 
                             step="0.5" 
                             value={deliverable.estimatedTime} 
                             onChange={(e) => updateDeliverable(index, 'estimatedTime', parseFloat(e.target.value) || 0)} 
+                            placeholder="Max 3 hours per task"
                           />
+                          {deliverable.estimatedTime > 3 && (
+                            <p className="text-xs text-poa-red-600 mt-1">
+                              Max 3 hours per deliverable
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <Button 
@@ -250,8 +349,15 @@ const CreatePlan = () => {
             </div>
             
             <div className="flex justify-between items-center border-t border-poa-gray-200 pt-4">
-              <div className="text-sm text-poa-gray-600">
-                Total Estimated Hours: {deliverables.reduce((total, d) => total + (d.estimatedTime || 0), 0).toFixed(1)}
+              <div className="text-sm text-poa-gray-600 flex items-center">
+                <span className={!isExactlyEightHours ? "text-poa-red-600 font-semibold" : ""}>
+                  Total Estimated Hours: {totalHours.toFixed(1)}/8.0
+                </span>
+                {!isExactlyEightHours && totalHours > 0 && (
+                  <span className="ml-2 text-xs px-2 py-1 bg-poa-gray-100 rounded-full">
+                    {totalHours < 8 ? `${(8 - totalHours).toFixed(1)} hours short` : `${(totalHours - 8).toFixed(1)} hours over`}
+                  </span>
+                )}
               </div>
               <div className="space-x-2">
                 <Button 
@@ -264,7 +370,7 @@ const CreatePlan = () => {
                 <Button 
                   type="submit" 
                   className="bg-poa-blue-600 hover:bg-poa-blue-700"
-                  disabled={!selectedProjectId || userProjects.length === 0}
+                  disabled={!selectedProjectId || userProjects.length === 0 || !isExactlyEightHours || !isSubmissionTimeValid}
                 >
                   Submit Plan
                 </Button>
