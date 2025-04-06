@@ -25,7 +25,7 @@ const formSchema = z.object({
   deliverables: z.array(
     z.object({
       description: z.string().min(5, { message: "Description should be at least 5 characters" }),
-      estimatedTime: z.coerce.number().min(0.5, { message: "Estimated time should be at least 0.5 hours" }),
+      estimatedTime: z.coerce.number().min(0.5, { message: "Estimated time should be at least 0.5 hours" }).max(3, { message: "Maximum 3 hours per deliverable" }),
     })
   ).min(1, { message: "At least one deliverable is required" }),
 });
@@ -78,6 +78,18 @@ const PlanDetail = () => {
   });
   
   const onSubmit = (values: z.infer<typeof formSchema>) => {
+    // Calculate total hours
+    const totalHours = values.deliverables.reduce((sum, d) => sum + d.estimatedTime, 0);
+    
+    // Check if total is exactly 8 hours
+    if (totalHours !== 8) {
+      form.setError('deliverables', { 
+        type: 'custom', 
+        message: `Total hours must be exactly 8 (current: ${totalHours})` 
+      });
+      return;
+    }
+    
     // Map form values to update the plan
     const updatedDeliverables: Deliverable[] = values.deliverables.map((d, index) => {
       // Get existing deliverable if it exists
@@ -95,8 +107,10 @@ const PlanDetail = () => {
     });
     
     // Update plan with new deliverables
-    updatePlan(plan.id, 'Pending', updatedDeliverables);
-    setIsEditDialogOpen(false);
+    const updated = updatePlan(plan.id, 'Pending', updatedDeliverables);
+    if (updated) {
+      setIsEditDialogOpen(false);
+    }
   };
   
   // Handle plan approval
@@ -107,7 +121,13 @@ const PlanDetail = () => {
     navigate('/approvals');
   };
   
-  const canEditPlan = user.id === plan.userId && plan.status === 'Needs Rework';
+  // Check if current user can edit this plan
+  // Can edit if:
+  // 1. User is the plan creator AND
+  // 2. Plan status is 'Needs Rework' OR it's a new plan in 'Pending' status
+  const canEditPlan = user.id === plan.userId && 
+    (plan.status === 'Needs Rework' || 
+     (plan.status === 'Pending' && !plan.approvals?.some(a => a.role === 'Team Lead')));
   
   // Check if current user can approve this plan
   const userProjectMember = getProjectMembers(plan.projectId).find(
@@ -129,8 +149,19 @@ const PlanDetail = () => {
     a => (a.role === 'Manager' || a.role === 'Temporary Manager')
   );
   
+  // Team lead can approve if:
+  // 1. User is a team lead for this project
+  // 2. Plan is pending
+  // 3. There's no team lead decision yet
+  // 4. User is not the plan creator
   const canApproveAsTeamLead = isTeamLead && plan.status === 'Pending' && !hasTeamLeadDecision && plan.userId !== user.id;
-  const canApproveAsManager = isManager && plan.status === 'Pending' && hasTeamLeadApproval && !hasManagerDecision;
+  
+  // Manager can approve if:
+  // 1. User is a manager for this project
+  // 2. Plan is pending
+  // 3. Manager hasn't made a decision yet
+  // Note: Removing the requirement for team lead approval for managers to be able to see plans
+  const canApproveAsManager = isManager && plan.status === 'Pending' && !hasManagerDecision;
   
   return (
     <Layout>
@@ -157,11 +188,28 @@ const PlanDetail = () => {
                     <DialogTitle>Edit Plan</DialogTitle>
                     <DialogDescription>
                       Make changes to your plan and submit it again for approval.
+                      {plan.status === 'Needs Rework' && plan.approvals && plan.approvals.length > 0 && (
+                        <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-sm">
+                          <strong>Feedback:</strong> {plan.approvals[plan.approvals.length - 1].comments || "Please revise this plan based on the reviewer's feedback."}
+                        </div>
+                      )}
                     </DialogDescription>
                   </DialogHeader>
                   
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                      {/* Show total hours warning */}
+                      <div className="text-sm flex justify-between">
+                        <span>Total planned hours:</span> 
+                        <span className={
+                          form.getValues().deliverables.reduce((sum, d) => sum + d.estimatedTime, 0) !== 8 
+                          ? "text-red-600 font-bold" 
+                          : "text-green-600 font-bold"
+                        }>
+                          {form.getValues().deliverables.reduce((sum, d) => sum + d.estimatedTime, 0)} / 8
+                        </span>
+                      </div>
+                      
                       {form.getValues().deliverables.map((_, index) => (
                         <div key={index} className="space-y-4 p-4 border rounded-md">
                           <FormField
@@ -185,15 +233,42 @@ const PlanDetail = () => {
                               <FormItem>
                                 <FormLabel>Estimated Hours</FormLabel>
                                 <FormControl>
-                                  <Input type="number" step="0.5" {...field} />
+                                  <Input 
+                                    type="number" 
+                                    step="0.5" 
+                                    {...field} 
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value);
+                                      if (value > 3) {
+                                        e.target.value = "3";
+                                        field.onChange(3);
+                                      } else {
+                                        field.onChange(e);
+                                      }
+                                    }}
+                                  />
                                 </FormControl>
                                 <FormDescription>
-                                  Estimated time in hours
+                                  Estimated time in hours (maximum 3 hours per deliverable)
                                 </FormDescription>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
+                          
+                          {form.getValues().deliverables.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                const deliverables = form.getValues().deliverables;
+                                form.setValue('deliverables', deliverables.filter((_, i) => i !== index));
+                              }}
+                            >
+                              Remove Deliverable
+                            </Button>
+                          )}
                         </div>
                       ))}
                       

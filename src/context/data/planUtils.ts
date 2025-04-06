@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Plan, Deliverable, PlanStatus, Approval, User } from '@/types';
 import { toast } from 'sonner';
@@ -25,13 +26,12 @@ export const usePlanUtils = (
       const hasManagerDecision = plan.approvals?.some(
         a => (a.role === 'Manager' || a.role === 'Temporary Manager')
       );
-      return plan.status === 'Pending' && hasTeamLeadApproval && !hasManagerDecision;
+      // Fix: Plans should show up for managers even if they don't have team lead approval yet
+      return plan.status === 'Pending' && !hasManagerDecision;
     } else if (userProjectMember.role === 'Team Lead') {
       const hasTeamLeadDecision = plan.approvals?.some(
         a => a.role === 'Team Lead'
       );
-      // Fix: we don't need to check projectId on userProjectMember since we already filtered by project
-      // when calling getProjectMembers(plan.projectId)
       const isTeamMemberPlan = plan.userId !== user.id;
       return plan.status === 'Pending' && !hasTeamLeadDecision && isTeamMemberPlan;
     }
